@@ -16,7 +16,8 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: "files", description: "List workspace files" },
   { name: "cat", args: "<path>", description: "Print a workspace file" },
   { name: "agent", description: "Switch to the configured Bedrock Agent" },
-  { name: "clear", description: "Clear the transcript (starts a new conversation)" },
+  { name: "theme", description: "Toggle light / dark" },
+  { name: "clear", description: "Start a new chat (the current one stays in the list)" },
   { name: "new", description: "Alias for /clear" },
 ];
 
@@ -35,6 +36,10 @@ Keys
   Enter        send        Shift+Enter  newline
   Esc          stop the current run
   ↑ / ↓        navigate slash-command suggestions
+
+Attach files with the paperclip, by dragging them onto the prompt, or by pasting.
+Images and PDFs go to the model directly; other files land in your workspace.
+Chats are saved to your cloud workspace and listed on the left.
 
 The agent can read/write files in your workspace (right panel), fetch docs,
 and generate images/videos. It cannot run shell commands; it will tell you what to run.`;

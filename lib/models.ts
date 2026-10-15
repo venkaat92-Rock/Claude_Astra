@@ -6,7 +6,7 @@ export interface ModelSpec {
   /** Stable id used by the UI and API (never changes when Bedrock ids rotate). */
   id: string;
   label: string;
-  vendor: "Anthropic" | "Amazon" | "Google" | "Luma";
+  vendor: "Anthropic" | "Amazon" | "Google" | "Luma" | "OpenAI";
   provider: ProviderKind;
   /**
    * Identifier passed to the underlying API:
@@ -180,6 +180,34 @@ export const DEFAULT_MODELS: ModelSpec[] = [
     capabilities: ["video"],
     description: "Text-to-video, 5 s or 9 s clips at 540p/720p. Async; output lands in S3.",
     notes: "us-west-2 only at launch; check Model access for your region.",
+    enabled: true,
+  },
+
+  // ---------------- OpenAI open-weight models hosted on Bedrock ----------------
+  {
+    id: "gpt-oss-120b",
+    label: "OpenAI gpt-oss 120B (Bedrock)",
+    vendor: "OpenAI",
+    provider: "bedrock-converse",
+    apiModelId: "openai.gpt-oss-120b-1:0",
+    capabilities: ["chat"],
+    description: "OpenAI's open-weight reasoning model, served by Bedrock. Chat only; tool use is not wired for it.",
+    contextWindow: 128_000,
+    defaults: { maxTokens: 8_000 },
+    notes: "verify: served from us-west-2 at launch; set ASTRA_BEDROCK_REGION accordingly or use a cross-region profile id.",
+    enabled: true,
+  },
+  {
+    id: "gpt-oss-20b",
+    label: "OpenAI gpt-oss 20B (Bedrock)",
+    vendor: "OpenAI",
+    provider: "bedrock-converse",
+    apiModelId: "openai.gpt-oss-20b-1:0",
+    capabilities: ["chat"],
+    description: "Smaller, faster gpt-oss. Chat only.",
+    contextWindow: 128_000,
+    defaults: { maxTokens: 8_000 },
+    notes: "verify: served from us-west-2 at launch.",
     enabled: true,
   },
 

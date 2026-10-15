@@ -2,8 +2,21 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { ModelInfo } from "@/lib/client/useAstra";
+import { usePref } from "@/lib/client/useTheme";
 
 interface FileRow { path: string; size: number; modified?: string }
+
+function Section({ id, title, children, extra }: { id: string; title: string; children: React.ReactNode; extra?: React.ReactNode }) {
+  const [folded, setFolded] = usePref(`fold:${id}`, false);
+  return (
+    <section>
+      <h3 onClick={() => setFolded((f) => !f)}>
+        <span>{folded ? "▸" : "▾"}</span> {title} {extra}
+      </h3>
+      {!folded && children}
+    </section>
+  );
+}
 
 export function Panel({ models, modelId, onPickModel, refreshKey, onOpenFile }: {
   models: ModelInfo[];
@@ -33,35 +46,38 @@ export function Panel({ models, modelId, onPickModel, refreshKey, onOpenFile }: 
 
   return (
     <aside className="panel">
-      <h3>Models</h3>
-      <div className="models">
-        {chat.map((m) => (
-          <div key={m.id} className={`m ${m.id === modelId ? "active" : ""} ${m.available ? "" : "off"}`} title={m.description} onClick={() => m.available && onPickModel(m.id)}>
-            <span className="v">{m.vendor}</span>
-            <span>{m.label}</span>
-            {!m.available && <span className="why">{m.reason}</span>}
-          </div>
-        ))}
-      </div>
-      <h3 style={{ marginTop: 14 }}>Media models</h3>
-      <div className="models">
-        {media.map((m) => (
-          <div key={m.id} className={`m ${m.available ? "" : "off"}`} title={m.description}>
-            <span className="v">{m.vendor}</span>
-            <span>{m.label}</span>
-            {!m.available && <span className="why">{m.reason}</span>}
-          </div>
-        ))}
-      </div>
-      <h3 style={{ marginTop: 14 }}>Workspace <button className="toggle" onClick={load}>↻</button></h3>
-      {err && <div className="empty">{err}</div>}
-      {!err && files && files.length === 0 && <div className="empty">empty — ask the agent to create a file</div>}
-      {!err && files?.map((f) => (
-        <div key={f.path} className="file" onClick={() => onOpenFile(f.path)}>
-          <span>{f.path}</span>
-          <span className="size">{fmtSize(f.size)}</span>
+      <Section id="models" title="Models">
+        <div className="models">
+          {chat.map((m) => (
+            <div key={m.id} className={`m ${m.id === modelId ? "active" : ""} ${m.available ? "" : "off"}`} title={m.description} onClick={() => m.available && onPickModel(m.id)}>
+              <span className="v">{m.vendor}</span>
+              <span>{m.label}</span>
+              {!m.available && <span className="why">{m.reason}</span>}
+            </div>
+          ))}
         </div>
-      ))}
+      </Section>
+      <Section id="media" title="Media models">
+        <div className="models">
+          {media.map((m) => (
+            <div key={m.id} className={`m ${m.available ? "" : "off"}`} title={m.description}>
+              <span className="v">{m.vendor}</span>
+              <span>{m.label}</span>
+              {!m.available && <span className="why">{m.reason}</span>}
+            </div>
+          ))}
+        </div>
+      </Section>
+      <Section id="workspace" title="Workspace" extra={<button className="toggle" onClick={(e) => { e.stopPropagation(); load(); }}>↻</button>}>
+        {err && <div className="empty">{err}</div>}
+        {!err && files && files.length === 0 && <div className="empty">empty — ask the agent to create a file, or attach one</div>}
+        {!err && files?.map((f) => (
+          <div key={f.path} className="file" onClick={() => onOpenFile(f.path)}>
+            <span>{f.path}</span>
+            <span className="size">{fmtSize(f.size)}</span>
+          </div>
+        ))}
+      </Section>
     </aside>
   );
 }

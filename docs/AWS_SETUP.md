@@ -15,10 +15,10 @@ availability in the Bedrock console for that region first.
 | Piece | AWS service | Created by |
 |---|---|---|
 | Web app + API routes (Next.js) | Amplify Hosting (SSR compute) | Amplify, from this repo |
-| Sign-in | Cognito user pool | `amplify/auth/resource.ts` |
+| Sign-in (accounts created by an admin) | Cognito user pool | `amplify/auth/resource.ts` + override in `amplify/backend.ts` |
 | Agent workspaces (files the agent edits) | S3 bucket | `amplify/storage/resource.ts` |
 | Generated videos | S3 bucket | `amplify/backend.ts` (`MediaBucket`) |
-| Conversation table (provisioned, not yet wired to the UI) | DynamoDB via AppSync | `amplify/data/resource.ts` |
+| Saved chats | same S3 bucket, under `.astra/conversations/` per user | `lib/server/conversations.ts` |
 | Server permissions for Bedrock + S3 | IAM role `AstraComputeRole` | `amplify/backend.ts` |
 | Claude, Nova, Luma inference | Amazon Bedrock | you enable model access |
 | Gemini (optional) | Google AI Studio, **not** AWS | API key in env vars |
@@ -101,7 +101,7 @@ the next step; no "app root" or monorepo setting is needed.
 
 1. Console → **AWS Amplify** → **Create new app** → **GitHub** → authorise the Amplify GitHub app for the repository.
 2. Pick the repo and branch (`main`). Amplify detects Next.js and Amplify Gen 2 and shows `amplify.yml` from the repo. Keep it.
-3. Under **Service role**, let Amplify create one (it needs it to run `ampx pipeline-deploy`, which creates Cognito, S3, DynamoDB and the compute role via CloudFormation).
+3. Under **Service role**, let Amplify create one (it needs it to run `ampx pipeline-deploy`, which creates Cognito, S3 and the compute role via CloudFormation).
 4. **Save and deploy**. The first build takes ~10 minutes. It will succeed, but the app will not work yet because the compute role and env vars are not set (steps 6–7).
 
 ---
@@ -112,7 +112,7 @@ When the build finishes, open the **Deployed backend resources** tab (or
 CloudFormation → stack `amplify-claudeastra-main-…` → **Outputs**) and copy:
 
 - `mediaBucketName` — the S3 bucket for video output
-- `workspaceBucketName` — the S3 bucket for agent workspaces
+- `workspaceBucketName` — the S3 bucket for agent workspaces and saved chats
 - `computeRoleArn` — the IAM role for the SSR compute
 
 (They are also in `amplify_outputs.json` under `custom` after `npx ampx sandbox`.)
@@ -163,7 +163,21 @@ The workspace bucket is read from `amplify_outputs.json` automatically; set
 
 ## 8. First sign-in and smoke test
 
-1. Open the Amplify URL. You get the Cognito sign-up form. Create an account and confirm the email code.
+### 8a. Create user accounts (admin only)
+
+Self sign-up is turned off: the user pool is set to `AllowAdminCreateUserOnly`
+and the sign-in page has no Sign up tab. To add someone:
+
+1. Console → **Amazon Cognito** → **User pools** → the pool named `amplifyAuthUserPool…` for this app (same region as the Amplify app).
+2. **Users** → **Create user**.
+3. **Invitation message**: *Send an email invitation*. **Email address**: theirs; tick *Mark email address as verified*.
+4. **Temporary password**: *Generate a password*. Click **Create user**.
+5. They receive an email with the app link and a temporary password; on first sign-in Cognito asks them to set a new one.
+
+To remove access, select the user and **Disable** (keeps their saved chats) or **Delete**.
+
+
+1. Create your own account first (step 8a below), then open the Amplify URL and sign in. The first sign-in asks you to replace the temporary password.
 2. In the terminal: `/models` lists the catalog with availability. `/model claude-sonnet-5-5` switches models.
 3. Try: `create hello.md in my workspace with a short greeting, then read it back`. You should see `write_file` and `read_file` tool blocks and the file in the right panel.
 4. `/image a watercolor lighthouse at dusk` → Nova Canvas → image preview.
@@ -244,4 +258,4 @@ to run as a single anonymous user with your local AWS credentials.
 - Bedrock bills per token / per image / per second of video. Claude Opus 5.5 is the default; switch the default to Sonnet or Haiku with `ASTRA_DEFAULT_MODEL` if cost matters more than capability.
 - Video jobs are the expensive item (Nova Reel and Luma bill per generated second). The UI only starts a job on an explicit `/video` or when the agent calls `generate_video`.
 - Add a Bedrock **Guardrail** and attach it in the console if you expose the app to other users; the Converse and Messages calls accept a guardrail id (not wired yet).
-- Cognito sign-up is open by default. To restrict, set `signUpVerificationMethod` / disable self-registration in the user pool, or add allowed email domains with a pre-sign-up Lambda trigger.
+- Accounts are admin-created (step 8a). If you later want self-service sign-up for a company domain, remove the `allowAdminCreateUserOnly` override in `amplify/backend.ts`, drop `hideSignUp` in `components/AuthGate.tsx`, and add a pre-sign-up Lambda trigger that allows only your email domain.

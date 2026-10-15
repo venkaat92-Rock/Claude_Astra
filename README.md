@@ -24,7 +24,7 @@ A Claude Code-style agent workbench you host yourself: a terminal-like web UI on
 | Providers: Claude on Bedrock, Nova via Converse, Gemini, Bedrock Agents, image, video | `lib/server/providers/` |
 | Model catalog (override with `ASTRA_MODELS_JSON`) | `lib/models.ts` |
 | HTTP API: `/api/chat` (NDJSON stream), `/api/models`, `/api/workspace`, `/api/generate/image`, `/api/generate/video` | `app/api/` |
-| Amplify Gen 2 backend: Cognito, S3 workspaces, media bucket, DynamoDB, compute IAM role | `amplify/` |
+| Amplify Gen 2 backend: Cognito (admin-created accounts), S3 workspaces + saved chats, media bucket, compute IAM role | `amplify/` |
 | Step-by-step AWS guide | [`docs/AWS_SETUP.md`](docs/AWS_SETUP.md) |
 
 ## Quick start (local)
@@ -56,7 +56,7 @@ Follow [`docs/AWS_SETUP.md`](docs/AWS_SETUP.md). Short version:
 ```
 /help  /model [id]  /models  /effort <low|medium|high|xhigh|max>
 /image <prompt>  /video <prompt> | /video luma <prompt> | /video status <arn>
-/files  /cat <path>  /agent  /clear
+/files  /cat <path>  /agent  /theme  /clear
 ```
 
 ## Design notes
@@ -66,7 +66,10 @@ Follow [`docs/AWS_SETUP.md`](docs/AWS_SETUP.md). Short version:
 - **Nova / other Bedrock models** go through the Converse API with the same tool definitions, so the agent loop is provider-neutral.
 - **Gemini is not on Bedrock.** The `gemini` provider calls Google directly; the only Google models Bedrock offers are open-weight Gemma, which you can enable as a `bedrock-converse` entry.
 - **Video is asynchronous.** `generate_video` returns an invocation ARN; `check_video` (or `/video status`) polls and presigns `output.mp4` from the media bucket.
-- The UI persists the current conversation in `localStorage`. The `Conversation` data model in `amplify/data` is provisioned for server-side history but not wired to the UI yet.
+- **Chats are saved in the cloud.** Each conversation is stored in the user's S3 workspace under `.astra/conversations/`, so the chat list on the left follows the user to any device. Double-click a chat to rename it.
+- **Attachments.** Paperclip, drag-and-drop or paste. Images (resized in the browser) and PDFs go to the model as vision/document input, small text files are inlined, and everything else is uploaded to `uploads/` in the workspace for the agent's file tools.
+- **Accounts are admin-created.** Self sign-up is disabled in the user pool and hidden from the sign-in screen; create users in the Cognito console.
+- **Light theme by default**, dark via the ☾ button or `/theme`.
 - No shell execution: the agent writes files and tells you what to run. Add AgentCore Code Interpreter or a Lambda-backed `run_command` tool if you need execution.
 
 ## Scripts

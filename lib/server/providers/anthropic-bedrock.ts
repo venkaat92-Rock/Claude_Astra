@@ -55,6 +55,10 @@ function toAnthropicMessages(messages: AstraMessage[], modelId: string): Anthrop
     for (const p of m.parts) {
       if (p.type === "text") content.push({ type: "text", text: p.text });
       else if (p.type === "image") content.push({ type: "image", source: { type: "base64", media_type: p.mediaType as Anthropic.Base64ImageSource["media_type"], data: p.data } });
+      else if (p.type === "document") {
+        if (p.mediaType === "application/pdf") content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: p.data }, title: p.name });
+        else content.push({ type: "document", source: { type: "text", media_type: "text/plain", data: Buffer.from(p.data, "base64").toString("utf8") }, title: p.name });
+      }
       else if (p.type === "tool_result") content.push({ type: "tool_result", tool_use_id: p.toolUseId, content: p.content, is_error: p.isError ?? false });
     }
     if (content.length === 0) content.push({ type: "text", text: "(empty)" });

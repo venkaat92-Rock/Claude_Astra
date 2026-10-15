@@ -32,7 +32,7 @@ function toGeminiContents(messages: AstraMessage[]): Content[] {
     const parts: Part[] = [];
     for (const p of m.parts) {
       if (p.type === "text") parts.push({ text: p.text });
-      else if (p.type === "image") parts.push({ inlineData: { mimeType: p.mediaType, data: p.data } });
+      else if (p.type === "image" || p.type === "document") parts.push({ inlineData: { mimeType: p.mediaType, data: p.data } });
       else if (p.type === "tool_result") {
         parts.push({ functionResponse: { id: p.toolUseId, name: p.name ?? "tool", response: p.isError ? { error: p.content } : { output: p.content } } });
       }
