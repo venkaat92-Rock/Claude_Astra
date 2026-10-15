@@ -219,7 +219,7 @@ Gemini is not available on Bedrock. Claude Astra talks to Google directly:
 2. Set `GOOGLE_API_KEY` (step 7). The Gemini rows in `/models` flip to available.
 3. For Vertex AI instead of AI Studio, swap the client construction in `lib/server/providers/gemini.ts` to `new GoogleGenAI({ vertexai: true, project, location })` and give the compute role Google credentials via Workload Identity Federation.
 
-If you only want Google models that **are** on Bedrock, enable **Gemma 4** under Model access, confirm its id in the Model catalog, and enable the `gemma-4-31b` entry via `ASTRA_MODELS_JSON`.
+If you only want Google models that **are** on Bedrock, open **Gemma 4** in the Model catalog, invoke it once from the playground, confirm its id, and enable the `gemma-4-31b` entry via `ASTRA_MODELS_JSON`.
 
 ---
 
