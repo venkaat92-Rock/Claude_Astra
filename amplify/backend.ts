@@ -26,7 +26,7 @@ const mediaStack = backend.createStack("ClaudeAstraMedia");
 const mediaBucket = new Bucket(mediaStack, "MediaBucket", {
   blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
   enforceSSL: true,
-  lifecycleRules: [{ expiration: undefined, abortIncompleteMultipartUploadAfter: undefined }],
+  // Generated videos are kept indefinitely; add a lifecycleRules expiration here if you want them auto-deleted.
 });
 
 const workspaceBucket = backend.storage.resources.bucket;
