@@ -19,7 +19,10 @@ let cached: ServerConfig | undefined;
 
 export function serverConfig(): ServerConfig {
   if (cached) return cached;
+  // ASTRA_BEDROCK_REGION lets Bedrock calls target a different region from the one
+  // the app is hosted in (e.g. app in us-west-2, Nova Canvas only in us-east-1).
   const region =
+    process.env.ASTRA_BEDROCK_REGION ||
     process.env.AWS_REGION ||
     process.env.AWS_DEFAULT_REGION ||
     amplifyOutputs.custom?.region ||

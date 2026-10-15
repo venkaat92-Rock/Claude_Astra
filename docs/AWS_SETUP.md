@@ -49,20 +49,33 @@ steps; the app itself runs with the narrower `AstraComputeRole`.
 
 ---
 
-## 2. Enable Bedrock model access
+## 2. Confirm Bedrock model access
 
-1. Console → **Amazon Bedrock** → left nav **Model access** (region **us-east-1**).
-2. Click **Modify model access** (or **Enable specific models**) and tick:
-   - Anthropic: **Claude Opus 5.5**, **Claude Sonnet 5.5**, **Claude Haiku 5.5**, **Claude Fable 5.1**, **Claude Opus 4.8**
-   - Amazon: **Nova 2 Lite**, **Nova Pro**, **Nova Premier**, **Nova Canvas**, **Nova Reel**
-   - Luma AI: **Ray 2** (enable in **us-west-2** too; Luma may not be offered in us-east-1)
-3. Anthropic models may show a short use-case form the first time. Fill it in; approval is usually immediate.
-4. Confirm each row reads **Access granted**.
+The old **Model access** page in the Bedrock console is retired. Serverless
+models are enabled automatically the first time your account invokes them.
+Two things still need a human:
+
+- **Anthropic models**: first-time users may be asked for use-case details.
+- **Marketplace-served models** (Luma Ray 2 and some partner models): the first
+  invoke must come from a principal with `aws-marketplace:Subscribe`.
+
+Trigger both from the playground, region **us-east-1**:
+
+1. Console → **Amazon Bedrock** → **Model catalog** → open **Claude Sonnet 5.5**
+   (or Opus 5.5) → **Open in playground** → send `hello`.
+   - A reply means Anthropic access is live.
+   - A **use case details** form means fill it in (company, "internal developer
+     assistant", team size) and submit; approval is normally immediate.
+   - An **AccessDenied** or Marketplace error means your IAM principal lacks
+     `aws-marketplace:Subscribe` or an SCP blocks Bedrock; an account admin fixes that.
+2. Repeat once with **Amazon Nova 2 Lite**. Nova Canvas, Nova Reel and Luma Ray 2
+   enable themselves on the app's first call.
+
+Administrators can still restrict models with IAM policies or Service Control Policies.
 
 Then verify from your laptop:
 
 ```bash
-cd claude-astra
 npm install
 AWS_REGION=us-east-1 npx tsx scripts/check-bedrock-access.ts
 ```
@@ -76,21 +89,11 @@ You want `PASS` on credentials, Claude and Nova. The media-bucket line will fail
 
 ---
 
-## 3. Put the code in GitHub
+## 3. The code is in GitHub
 
-Claude Astra lives in the `claude-astra/` folder of this repository. Amplify can
-build a sub-folder, but a dedicated repository is cleaner. To split it out:
-
-```bash
-# from the root of this repo, on the branch that contains claude-astra/
-git subtree split --prefix=claude-astra -b claude-astra-only
-# create an empty repo on GitHub called claude-astra, then:
-git push git@github.com:<you>/claude-astra.git claude-astra-only:main
-```
-
-If you keep it as a sub-folder, set **App root directory** to `claude-astra`
-when you connect the app in step 4 (Amplify → App settings → Build settings →
-"Monorepo / app root"). Everything else is identical.
+Claude Astra lives in its own repository: https://github.com/venkaat92-Rock/Claude_Astra
+(`main` branch, app at the repository root). Amplify connects to it directly in
+the next step; no "app root" or monorepo setting is needed.
 
 ---
 
@@ -98,9 +101,8 @@ when you connect the app in step 4 (Amplify → App settings → Build settings 
 
 1. Console → **AWS Amplify** → **Create new app** → **GitHub** → authorise the Amplify GitHub app for the repository.
 2. Pick the repo and branch (`main`). Amplify detects Next.js and Amplify Gen 2 and shows `amplify.yml` from the repo. Keep it.
-3. If the app is in the `claude-astra/` sub-folder, expand **Advanced settings** → **App root** = `claude-astra`.
-4. Under **Service role**, let Amplify create one (it needs it to run `ampx pipeline-deploy`, which creates Cognito, S3, DynamoDB and the compute role via CloudFormation).
-5. **Save and deploy**. The first build takes ~10 minutes. It will succeed, but the app will not work yet because the compute role and env vars are not set (steps 6–7).
+3. Under **Service role**, let Amplify create one (it needs it to run `ampx pipeline-deploy`, which creates Cognito, S3, DynamoDB and the compute role via CloudFormation).
+4. **Save and deploy**. The first build takes ~10 minutes. It will succeed, but the app will not work yet because the compute role and env vars are not set (steps 6–7).
 
 ---
 
@@ -140,7 +142,7 @@ Amplify → **App settings** → **Environment variables** → add:
 
 | Key | Value | Required |
 |---|---|---|
-| `AWS_REGION` | `us-east-1` | yes |
+| `ASTRA_BEDROCK_REGION` | `us-east-1` | yes if the app is hosted outside us-east-1 (Nova Canvas is only served there) |
 | `ASTRA_MEDIA_BUCKET` | `mediaBucketName` from step 5 | for video |
 | `ASTRA_MEDIA_PREFIX` | `videos/` | no |
 | `ASTRA_DEFAULT_MODEL` | `claude-opus-5-5` | no |
@@ -149,6 +151,9 @@ Amplify → **App settings** → **Environment variables** → add:
 | `BEDROCK_AGENT_ID` | from step 10 | for Bedrock Agents |
 | `BEDROCK_AGENT_ALIAS_ID` | from step 10 | for Bedrock Agents |
 
+Do **not** add `AWS_REGION` (or anything starting with `AWS`): Amplify rejects
+that prefix as reserved. Use `ASTRA_BEDROCK_REGION` to pick the Bedrock region; without
+it the app uses the region it is hosted in.
 Do **not** set `ASTRA_AUTH_MODE` on Amplify. Redeploy after saving.
 
 The workspace bucket is read from `amplify_outputs.json` automatically; set
@@ -165,7 +170,7 @@ The workspace bucket is read from `amplify_outputs.json` automatically; set
 5. `/video a drone shot over a misty forest at sunrise` → returns an invocation ARN. After 2–8 minutes `/video status <arn>` returns a playable URL. The agent can do the same with its `generate_video` / `check_video` tools.
 
 If a Claude call fails with `AccessDeniedException`, re-check step 2 in the
-**same region** as `AWS_REGION`. If it fails with `CredentialsProviderError`,
+**same region** the app is deployed in. If it fails with `CredentialsProviderError`,
 step 6 was skipped.
 
 ---
@@ -217,14 +222,13 @@ Gemini is not available on Bedrock. Claude Astra talks to Google directly:
 2. Set `GOOGLE_API_KEY` (step 7). The Gemini rows in `/models` flip to available.
 3. For Vertex AI instead of AI Studio, swap the client construction in `lib/server/providers/gemini.ts` to `new GoogleGenAI({ vertexai: true, project, location })` and give the compute role Google credentials via Workload Identity Federation.
 
-If you only want Google models that **are** on Bedrock, enable **Gemma 4** under Model access, confirm its id in the Model catalog, and enable the `gemma-4-31b` entry via `ASTRA_MODELS_JSON`.
+If you only want Google models that **are** on Bedrock, open **Gemma 4** in the Model catalog, invoke it once from the playground, confirm its id, and enable the `gemma-4-31b` entry via `ASTRA_MODELS_JSON`.
 
 ---
 
 ## 12. Local development
 
 ```bash
-cd claude-astra
 cp .env.example .env.local      # edit AWS_REGION, ASTRA_MEDIA_BUCKET, GOOGLE_API_KEY
 npx ampx sandbox                 # deploys a personal backend; writes amplify_outputs.json
 npm run dev                      # http://localhost:3000 with real Cognito sign-in
