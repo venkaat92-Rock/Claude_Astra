@@ -5,6 +5,7 @@ import { Amplify } from "aws-amplify";
 import { Authenticator, ThemeProvider, createTheme, defaultDarkModeOverride } from "@aws-amplify/ui-react";
 import "@aws-amplify/ui-react/styles.css";
 import { amplifyOutputs, hasAmplifyAuth } from "@/lib/amplify-config";
+import { readTheme, type Theme } from "@/lib/client/useTheme";
 
 if (hasAmplifyAuth) {
   Amplify.configure(amplifyOutputs as Parameters<typeof Amplify.configure>[0], { ssr: true });
@@ -25,13 +26,15 @@ const theme = createTheme({
  */
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const [mode, setMode] = useState<Theme>("light");
+  useEffect(() => { setMounted(true); setMode(readTheme()); }, []);
   if (!mounted) return null;
   if (!hasAmplifyAuth) return <>{children}</>;
+  // Accounts are created by an administrator in the Cognito console; there is no self sign-up.
   return (
-    <ThemeProvider theme={theme} colorMode="dark">
+    <ThemeProvider theme={theme} colorMode={mode}>
       <div className="auth-shell">
-        <Authenticator signUpAttributes={["email"]} variation="default">
+        <Authenticator hideSignUp variation="default">
           {() => <>{children}</>}
         </Authenticator>
       </div>

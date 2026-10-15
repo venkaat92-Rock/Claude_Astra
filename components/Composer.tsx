@@ -1,12 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { SLASH_COMMANDS } from "@/lib/client/slash-commands";
+import { prepareAttachment, type Attachment } from "@/lib/client/attachments";
+import type { AstraPart } from "@/lib/types";
 
-export function Composer({ busy, onSend, onStop }: { busy: boolean; onSend: (text: string) => void; onStop: () => void }) {
+export function Composer({ busy, onSend, onStop }: {
+  busy: boolean;
+  onSend: (text: string, attachments: Attachment[]) => void | Promise<void>;
+  onStop: () => void;
+}) {
   const [value, setValue] = useState("");
   const [sel, setSel] = useState(0);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [drag, setDrag] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const showSuggest = value.startsWith("/") && !value.includes(" ") && !value.includes("\n");
   const matches = showSuggest ? SLASH_COMMANDS.filter((c) => ("/" + c.name).startsWith(value.toLowerCase())) : [];
@@ -19,18 +28,29 @@ export function Composer({ busy, onSend, onStop }: { busy: boolean; onSend: (tex
   }, [value]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && busy) onStop();
-    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && busy) onStop(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [busy, onStop]);
 
+  const addFiles = useCallback(async (files: FileList | File[]) => {
+    const list = Array.from(files);
+    if (!list.length) return;
+    const placeholders: Attachment[] = list.map((f) => ({ id: `${f.name}-${f.size}-${Math.random()}`, name: f.name, size: f.size, kind: "file", status: "processing", parts: [] }));
+    setAttachments((a) => [...a, ...placeholders]);
+    await Promise.all(list.map(async (f, i) => {
+      const ready = await prepareAttachment(f);
+      setAttachments((a) => a.map((x) => (x.id === placeholders[i].id ? { ...ready, id: x.id } : x)));
+    }));
+  }, []);
+
   const submit = () => {
     const text = value.trim();
-    if (!text) return;
-    onSend(text);
+    const pending = attachments.some((a) => a.status === "processing");
+    if ((!text && attachments.length === 0) || pending) return;
+    void onSend(text, attachments);
     setValue("");
+    setAttachments([]);
     setSel(0);
   };
 
@@ -52,8 +72,21 @@ export function Composer({ busy, onSend, onStop }: { busy: boolean; onSend: (tex
     }
   };
 
+  const onPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(e.clipboardData.files ?? []);
+    if (files.length) {
+      e.preventDefault();
+      void addFiles(files);
+    }
+  };
+
   return (
-    <div className="composer">
+    <div
+      className={`composer ${drag ? "drag" : ""}`}
+      onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+      onDragLeave={() => setDrag(false)}
+      onDrop={(e) => { e.preventDefault(); setDrag(false); void addFiles(e.dataTransfer.files); }}
+    >
       {matches.length > 0 && (
         <div className="suggest">
           {matches.map((c, i) => (
@@ -64,22 +97,41 @@ export function Composer({ busy, onSend, onStop }: { busy: boolean; onSend: (tex
           ))}
         </div>
       )}
+      {attachments.length > 0 && (
+        <div className="attachments">
+          {attachments.map((a) => (
+            <span key={a.id} className={`chip ${a.status === "error" ? "err" : ""}`} title={a.error ?? a.path ?? a.name}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {a.preview ? <img src={a.preview} alt="" /> : <span className="k">{a.status === "processing" ? "…" : a.kind === "document" ? "PDF" : a.kind === "text" ? "txt" : "file"}</span>}
+              <span className="n">{a.name}</span>
+              {a.status === "error" && <span className="k">failed</span>}
+              {a.path && <span className="k">→ workspace</span>}
+              <button className="x" onClick={() => setAttachments((l) => l.filter((x) => x.id !== a.id))} title="Remove">✕</button>
+            </span>
+          ))}
+        </div>
+      )}
       <div className="composer-row">
         <span className="caret">❯</span>
         <textarea
           ref={ref}
           value={value}
           rows={1}
-          placeholder={busy ? "Running… (Esc to stop)" : "Ask Claude Astra anything, or type / for commands"}
+          placeholder={busy ? "Running… (Esc to stop)" : "Ask Claude Astra anything, drop files here, or type / for commands"}
           onChange={(e) => { setValue(e.target.value); setSel(0); }}
           onKeyDown={onKeyDown}
+          onPaste={onPaste}
           autoFocus
         />
         <div className="actions">
-          {busy ? <button onClick={onStop}>stop</button> : <button onClick={submit} disabled={!value.trim()}>send</button>}
+          <input ref={fileRef} type="file" multiple hidden onChange={(e) => { if (e.target.files) void addFiles(e.target.files); e.target.value = ""; }} />
+          <button className="icon" title="Attach files (images, PDFs, text, anything else goes to the workspace)" onClick={() => fileRef.current?.click()}>📎</button>
+          {busy ? <button onClick={onStop}>stop</button> : <button onClick={submit} disabled={(!value.trim() && attachments.length === 0) || attachments.some((a) => a.status === "processing")}>send</button>}
         </div>
       </div>
-      <div className="hint">Enter to send · Shift+Enter newline · Esc stops · / commands</div>
+      <div className="hint">Enter to send · Shift+Enter newline · Esc stops · / commands · 📎 or drag/paste to attach</div>
     </div>
   );
 }
+
+export type { AstraPart };

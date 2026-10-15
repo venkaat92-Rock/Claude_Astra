@@ -12,6 +12,9 @@ import { serverConfig } from "./config";
  * Per-user agent workspace stored in S3 under `workspaces/{identityId}/`.
  * Every path the model supplies is normalised and confined to that prefix.
  */
+/** Internal prefix (saved conversations, settings); hidden from file listings and tools. */
+export const INTERNAL_DIR = ".astra";
+
 export class Workspace {
   private s3: S3Client;
   readonly bucket: string;
@@ -55,7 +58,9 @@ export class Workspace {
       );
       for (const o of res.Contents ?? []) {
         if (!o.Key) continue;
-        out.push({ path: this.relative(o.Key), size: o.Size ?? 0, modified: o.LastModified?.toISOString() });
+        const rel = this.relative(o.Key);
+        if (rel === INTERNAL_DIR || rel.startsWith(INTERNAL_DIR + "/")) continue;
+        out.push({ path: rel, size: o.Size ?? 0, modified: o.LastModified?.toISOString() });
         if (out.length >= limit) return out;
       }
       token = res.IsTruncated ? res.NextContinuationToken : undefined;

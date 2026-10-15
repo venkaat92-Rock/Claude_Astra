@@ -6,6 +6,7 @@ import {
   type Tool,
   type ToolInputSchema,
   type ImageFormat,
+  type DocumentFormat,
 } from "@aws-sdk/client-bedrock-runtime";
 import type { AstraEvent, AstraMessage, AstraPart } from "@/lib/types";
 import { serverConfig } from "../config";
@@ -21,6 +22,18 @@ function getClient(): BedrockRuntimeClient {
 function imageFormat(mediaType: string): ImageFormat {
   const sub = mediaType.split("/")[1] ?? "png";
   return (sub === "jpg" ? "jpeg" : sub) as ImageFormat;
+}
+
+const DOC_FORMATS: Record<string, DocumentFormat> = {
+  "application/pdf": "pdf", "text/csv": "csv", "text/plain": "txt", "text/markdown": "md", "text/html": "html",
+  "application/msword": "doc", "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/vnd.ms-excel": "xls", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+};
+
+/** Converse document names allow only letters, digits, spaces, hyphens, parentheses and brackets. */
+function docName(name: string): string {
+  const base = name.replace(/\.[^.]+$/, "").replace(/[^A-Za-z0-9 ()\[\]-]+/g, " ").replace(/\s+/g, " ").trim();
+  return (base || "document").slice(0, 60);
 }
 
 function toConverseMessages(messages: AstraMessage[]): Message[] {
@@ -45,6 +58,10 @@ function toConverseMessages(messages: AstraMessage[]): Message[] {
     for (const p of m.parts) {
       if (p.type === "text" && p.text.trim()) content.push({ text: p.text });
       else if (p.type === "image") content.push({ image: { format: imageFormat(p.mediaType), source: { bytes: Buffer.from(p.data, "base64") } } });
+      else if (p.type === "document") {
+        const format = DOC_FORMATS[p.mediaType] ?? "txt";
+        content.push({ document: { format, name: docName(p.name), source: { bytes: Buffer.from(p.data, "base64") } } });
+      }
       else if (p.type === "tool_result") {
         content.push({ toolResult: { toolUseId: p.toolUseId, content: [{ text: p.content || "(empty)" }], status: p.isError ? "error" : "success" } });
       }

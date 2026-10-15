@@ -27,7 +27,9 @@ export type MediaRef = {
 export type AstraPart =
   | { type: "text"; text: string }
   | { type: "thinking"; text: string }
-  | { type: "image"; mediaType: string; data: string }
+  | { type: "image"; mediaType: string; data: string; name?: string }
+  /** PDF (or other document) attached by the user, base64-encoded. */
+  | { type: "document"; mediaType: string; data: string; name: string }
   | { type: "tool_use"; id: string; name: string; input: unknown }
   | {
       type: "tool_result";
@@ -76,6 +78,19 @@ export type AstraEvent =
   | { type: "status"; text: string }
   | { type: "error"; message: string; code?: string }
   | { type: "done"; stopReason: StopReason; iterations: number };
+
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  modelId: string;
+  updatedAt: string;
+  messageCount: number;
+}
+
+export interface ConversationRecord extends ConversationSummary {
+  messages: AstraMessage[];
+  effort?: Effort;
+}
 
 export interface ChatRequestBody {
   messages: AstraMessage[];

@@ -82,12 +82,31 @@ export function Transcript({ entries, draft, modelLabels }: { entries: Entry[]; 
         }
         const m = e.message;
         if (m.role === "user") {
-          const text = m.parts.filter((p) => p.type === "text").map((p) => (p as { text: string }).text).join("\n");
-          if (!text && m.parts.every((p) => p.type === "tool_result")) return null; // tool results render under their tool call
+          if (m.parts.every((p) => p.type === "tool_result")) return null; // tool results render under their tool call
+          const text = m.parts
+            .filter((p): p is Extract<AstraPart, { type: "text" }> => p.type === "text" && !p.text.startsWith("<attached_file "))
+            .map((p) => p.text)
+            .join("\n");
+          const attachments = m.parts.filter((p) => p.type === "image" || p.type === "document" || (p.type === "text" && p.text.startsWith("<attached_file ")));
           return (
             <div key={m.id} className="msg msg-user">
               <span className="caret">❯</span>
-              <span className="body">{text}</span>
+              <div style={{ minWidth: 0 }}>
+                {attachments.length > 0 && (
+                  <div className="attachments">
+                    {attachments.map((p, i) => {
+                      if (p.type === "image") {
+                        // eslint-disable-next-line @next/next/no-img-element
+                        return <img key={i} className="full" src={`data:${p.mediaType};base64,${p.data}`} alt={p.name ?? "attached image"} />;
+                      }
+                      if (p.type === "document") return <span key={i} className="chip"><span className="k">PDF</span><span className="n">{p.name}</span></span>;
+                      const name = /name="([^"]*)"/.exec((p as { text: string }).text)?.[1] ?? "file";
+                      return <span key={i} className="chip"><span className="k">txt</span><span className="n">{name}</span></span>;
+                    })}
+                  </div>
+                )}
+                {text && <span className="body">{text}</span>}
+              </div>
             </div>
           );
         }

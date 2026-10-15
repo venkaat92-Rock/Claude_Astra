@@ -1,17 +1,15 @@
 import { defineBackend } from "@aws-amplify/backend";
 import { Stack } from "aws-cdk-lib";
 import { Bucket, BlockPublicAccess } from "aws-cdk-lib/aws-s3";
-import { PolicyStatement, Effect, Role, ServicePrincipal, ManagedPolicy } from "aws-cdk-lib/aws-iam";
+import { PolicyStatement, Effect, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { auth } from "./auth/resource";
-import { data } from "./data/resource";
 import { storage } from "./storage/resource";
 
 /**
  * Claude Astra backend.
  *
- * - auth:    Cognito user pool
- * - data:    DynamoDB/AppSync conversation store
- * - storage: S3 bucket for agent workspaces
+ * - auth:    Cognito user pool (admin-created accounts only; self sign-up is off)
+ * - storage: S3 bucket for agent workspaces and saved conversations
  * - mediaBucket: S3 bucket Bedrock writes generated videos into
  * - computeRole: IAM role you attach to the Amplify Hosting SSR compute so
  *   route handlers can call Bedrock, read/write both buckets, and invoke Bedrock Agents.
@@ -19,7 +17,13 @@ import { storage } from "./storage/resource";
  * After the first deploy, copy the `computeRoleArn` and `mediaBucketName` outputs
  * into the Amplify Console (see docs/AWS_SETUP.md, steps 6-7).
  */
-const backend = defineBackend({ auth, data, storage });
+const backend = defineBackend({ auth, storage });
+
+// Only an administrator creates accounts (Cognito console -> Users -> Create user).
+// Self sign-up is disabled at the user pool level, and the sign-in UI hides the Sign up tab.
+backend.auth.resources.cfnResources.cfnUserPool.adminCreateUserConfig = {
+  allowAdminCreateUserOnly: true,
+};
 
 const mediaStack = backend.createStack("ClaudeAstraMedia");
 
@@ -79,7 +83,6 @@ const computeRole = new Role(mediaStack, "AstraComputeRole", {
 });
 computeRole.addToPolicy(bedrockInvoke);
 computeRole.addToPolicy(bucketAccess);
-computeRole.addManagedPolicy(ManagedPolicy.fromAwsManagedPolicyName("AWSAppSyncInvokeFullAccess"));
 
 /**
  * Bedrock writes async-invoke output to S3 using the caller's identity, so the
