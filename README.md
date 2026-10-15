@@ -48,7 +48,7 @@ Follow [`docs/AWS_SETUP.md`](docs/AWS_SETUP.md). Short version:
 1. Enable model access in Bedrock (Claude, Nova, Luma).
 2. Connect the repo to Amplify Hosting; the build runs `ampx pipeline-deploy`.
 3. Attach the generated `AstraComputeRole` as the Amplify **compute role**.
-4. Set `AWS_REGION`, `ASTRA_MEDIA_BUCKET` (+ `GOOGLE_API_KEY`, `BEDROCK_AGENT_ID` if used) as environment variables.
+4. Set `ASTRA_MEDIA_BUCKET` (+ `GOOGLE_API_KEY`, `BEDROCK_AGENT_ID` if used) as environment variables. Don't set `AWS_REGION`; Amplify reserves the `AWS` prefix.
 5. Redeploy, sign up, type `/help`.
 
 ## Slash commands

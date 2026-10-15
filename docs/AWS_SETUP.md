@@ -142,7 +142,6 @@ Amplify → **App settings** → **Environment variables** → add:
 
 | Key | Value | Required |
 |---|---|---|
-| `AWS_REGION` | `us-east-1` | yes |
 | `ASTRA_MEDIA_BUCKET` | `mediaBucketName` from step 5 | for video |
 | `ASTRA_MEDIA_PREFIX` | `videos/` | no |
 | `ASTRA_DEFAULT_MODEL` | `claude-opus-5-5` | no |
@@ -151,6 +150,8 @@ Amplify → **App settings** → **Environment variables** → add:
 | `BEDROCK_AGENT_ID` | from step 10 | for Bedrock Agents |
 | `BEDROCK_AGENT_ALIAS_ID` | from step 10 | for Bedrock Agents |
 
+Do **not** add `AWS_REGION` (or anything starting with `AWS`): Amplify rejects
+that prefix as reserved, and the server runtime already provides the region.
 Do **not** set `ASTRA_AUTH_MODE` on Amplify. Redeploy after saving.
 
 The workspace bucket is read from `amplify_outputs.json` automatically; set
@@ -167,7 +168,7 @@ The workspace bucket is read from `amplify_outputs.json` automatically; set
 5. `/video a drone shot over a misty forest at sunrise` → returns an invocation ARN. After 2–8 minutes `/video status <arn>` returns a playable URL. The agent can do the same with its `generate_video` / `check_video` tools.
 
 If a Claude call fails with `AccessDeniedException`, re-check step 2 in the
-**same region** as `AWS_REGION`. If it fails with `CredentialsProviderError`,
+**same region** the app is deployed in. If it fails with `CredentialsProviderError`,
 step 6 was skipped.
 
 ---
