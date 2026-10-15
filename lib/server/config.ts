@@ -1,0 +1,83 @@
+import { readFileSync } from "node:fs";
+import { amplifyOutputs } from "@/lib/amplify-config";
+import { DEFAULT_MODELS, DEFAULT_MODEL_ID, type ModelSpec } from "@/lib/models";
+
+export interface ServerConfig {
+  region: string;
+  mediaBucket?: string;
+  mediaPrefix: string;
+  workspaceBucket?: string;
+  googleApiKey?: string;
+  bedrockAgentId?: string;
+  bedrockAgentAliasId?: string;
+  claudeFallbackModel?: string;
+  authMode: "cognito" | "none";
+  defaultModelId: string;
+}
+
+let cached: ServerConfig | undefined;
+
+export function serverConfig(): ServerConfig {
+  if (cached) return cached;
+  const region =
+    process.env.AWS_REGION ||
+    process.env.AWS_DEFAULT_REGION ||
+    amplifyOutputs.custom?.region ||
+    amplifyOutputs.storage?.aws_region ||
+    "us-east-1";
+  const authMode = process.env.ASTRA_AUTH_MODE === "none" ? "none" : "cognito";
+  if (authMode === "none" && process.env.NODE_ENV === "production" && process.env.AWS_APP_ID) {
+    // Refuse to run unauthenticated on Amplify Hosting.
+    throw new Error("ASTRA_AUTH_MODE=none is not allowed on a deployed environment");
+  }
+  cached = {
+    region,
+    mediaBucket: process.env.ASTRA_MEDIA_BUCKET || amplifyOutputs.custom?.mediaBucketName,
+    mediaPrefix: (process.env.ASTRA_MEDIA_PREFIX || "videos/").replace(/^\/+/, ""),
+    workspaceBucket:
+      process.env.ASTRA_WORKSPACE_BUCKET ||
+      amplifyOutputs.custom?.workspaceBucketName ||
+      amplifyOutputs.storage?.bucket_name,
+    googleApiKey: process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY,
+    bedrockAgentId: process.env.BEDROCK_AGENT_ID,
+    bedrockAgentAliasId: process.env.BEDROCK_AGENT_ALIAS_ID,
+    claudeFallbackModel: process.env.ASTRA_CLAUDE_FALLBACK_MODEL,
+    authMode,
+    defaultModelId: process.env.ASTRA_DEFAULT_MODEL || DEFAULT_MODEL_ID,
+  };
+  return cached;
+}
+
+let modelCache: ModelSpec[] | undefined;
+
+/** Model catalog: defaults merged with ASTRA_MODELS_JSON overrides (by id). */
+export function modelCatalog(): ModelSpec[] {
+  if (modelCache) return modelCache;
+  const merged = new Map(DEFAULT_MODELS.map((m) => [m.id, m]));
+  const overridePath = process.env.ASTRA_MODELS_JSON;
+  if (overridePath) {
+    try {
+      const extra = JSON.parse(readFileSync(overridePath, "utf8")) as Partial<ModelSpec>[];
+      for (const m of extra) {
+        if (!m.id) continue;
+        merged.set(m.id, { ...(merged.get(m.id) ?? ({} as ModelSpec)), ...m } as ModelSpec);
+      }
+    } catch (err) {
+      console.warn(`[claude-astra] could not read ASTRA_MODELS_JSON (${overridePath}):`, err);
+    }
+  }
+  modelCache = [...merged.values()];
+  return modelCache;
+}
+
+/** Attach runtime availability (missing keys, missing agent ids) to each model. */
+export function modelAvailability(m: ModelSpec): { available: boolean; reason?: string } {
+  const cfg = serverConfig();
+  if (!m.enabled) return { available: false, reason: m.notes ?? "disabled" };
+  if (m.provider === "gemini" && !cfg.googleApiKey) return { available: false, reason: "GOOGLE_API_KEY not set" };
+  if (m.provider === "bedrock-agent" && !(cfg.bedrockAgentId && cfg.bedrockAgentAliasId)) {
+    return { available: false, reason: "BEDROCK_AGENT_ID / BEDROCK_AGENT_ALIAS_ID not set" };
+  }
+  if (m.provider === "bedrock-video" && !cfg.mediaBucket) return { available: false, reason: "ASTRA_MEDIA_BUCKET not set" };
+  return { available: true };
+}
