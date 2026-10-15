@@ -142,6 +142,7 @@ Amplify → **App settings** → **Environment variables** → add:
 
 | Key | Value | Required |
 |---|---|---|
+| `ASTRA_BEDROCK_REGION` | `us-east-1` | yes if the app is hosted outside us-east-1 (Nova Canvas is only served there) |
 | `ASTRA_MEDIA_BUCKET` | `mediaBucketName` from step 5 | for video |
 | `ASTRA_MEDIA_PREFIX` | `videos/` | no |
 | `ASTRA_DEFAULT_MODEL` | `claude-opus-5-5` | no |
@@ -151,7 +152,8 @@ Amplify → **App settings** → **Environment variables** → add:
 | `BEDROCK_AGENT_ALIAS_ID` | from step 10 | for Bedrock Agents |
 
 Do **not** add `AWS_REGION` (or anything starting with `AWS`): Amplify rejects
-that prefix as reserved, and the server runtime already provides the region.
+that prefix as reserved. Use `ASTRA_BEDROCK_REGION` to pick the Bedrock region; without
+it the app uses the region it is hosted in.
 Do **not** set `ASTRA_AUTH_MODE` on Amplify. Redeploy after saving.
 
 The workspace bucket is read from `amplify_outputs.json` automatically; set
