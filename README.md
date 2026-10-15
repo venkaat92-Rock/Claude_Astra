@@ -30,7 +30,7 @@ A Claude Code-style agent workbench you host yourself: a terminal-like web UI on
 ## Quick start (local)
 
 ```bash
-cd claude-astra
+git clone https://github.com/venkaat92-Rock/Claude_Astra.git && cd Claude_Astra
 npm install
 cp .env.example .env.local        # set AWS_REGION, ASTRA_MEDIA_BUCKET; optionally GOOGLE_API_KEY
 npx tsx scripts/check-bedrock-access.ts   # verifies model access + credentials

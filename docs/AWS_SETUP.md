@@ -62,7 +62,6 @@ steps; the app itself runs with the narrower `AstraComputeRole`.
 Then verify from your laptop:
 
 ```bash
-cd claude-astra
 npm install
 AWS_REGION=us-east-1 npx tsx scripts/check-bedrock-access.ts
 ```
@@ -76,21 +75,11 @@ You want `PASS` on credentials, Claude and Nova. The media-bucket line will fail
 
 ---
 
-## 3. Put the code in GitHub
+## 3. The code is in GitHub
 
-Claude Astra lives in the `claude-astra/` folder of this repository. Amplify can
-build a sub-folder, but a dedicated repository is cleaner. To split it out:
-
-```bash
-# from the root of this repo, on the branch that contains claude-astra/
-git subtree split --prefix=claude-astra -b claude-astra-only
-# create an empty repo on GitHub called claude-astra, then:
-git push git@github.com:<you>/claude-astra.git claude-astra-only:main
-```
-
-If you keep it as a sub-folder, set **App root directory** to `claude-astra`
-when you connect the app in step 4 (Amplify → App settings → Build settings →
-"Monorepo / app root"). Everything else is identical.
+Claude Astra lives in its own repository: https://github.com/venkaat92-Rock/Claude_Astra
+(`main` branch, app at the repository root). Amplify connects to it directly in
+the next step; no "app root" or monorepo setting is needed.
 
 ---
 
@@ -98,9 +87,8 @@ when you connect the app in step 4 (Amplify → App settings → Build settings 
 
 1. Console → **AWS Amplify** → **Create new app** → **GitHub** → authorise the Amplify GitHub app for the repository.
 2. Pick the repo and branch (`main`). Amplify detects Next.js and Amplify Gen 2 and shows `amplify.yml` from the repo. Keep it.
-3. If the app is in the `claude-astra/` sub-folder, expand **Advanced settings** → **App root** = `claude-astra`.
-4. Under **Service role**, let Amplify create one (it needs it to run `ampx pipeline-deploy`, which creates Cognito, S3, DynamoDB and the compute role via CloudFormation).
-5. **Save and deploy**. The first build takes ~10 minutes. It will succeed, but the app will not work yet because the compute role and env vars are not set (steps 6–7).
+3. Under **Service role**, let Amplify create one (it needs it to run `ampx pipeline-deploy`, which creates Cognito, S3, DynamoDB and the compute role via CloudFormation).
+4. **Save and deploy**. The first build takes ~10 minutes. It will succeed, but the app will not work yet because the compute role and env vars are not set (steps 6–7).
 
 ---
 
@@ -224,7 +212,6 @@ If you only want Google models that **are** on Bedrock, enable **Gemma 4** under
 ## 12. Local development
 
 ```bash
-cd claude-astra
 cp .env.example .env.local      # edit AWS_REGION, ASTRA_MEDIA_BUCKET, GOOGLE_API_KEY
 npx ampx sandbox                 # deploys a personal backend; writes amplify_outputs.json
 npm run dev                      # http://localhost:3000 with real Cognito sign-in
