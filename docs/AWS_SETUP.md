@@ -49,15 +49,29 @@ steps; the app itself runs with the narrower `AstraComputeRole`.
 
 ---
 
-## 2. Enable Bedrock model access
+## 2. Confirm Bedrock model access
 
-1. Console → **Amazon Bedrock** → left nav **Model access** (region **us-east-1**).
-2. Click **Modify model access** (or **Enable specific models**) and tick:
-   - Anthropic: **Claude Opus 5.5**, **Claude Sonnet 5.5**, **Claude Haiku 5.5**, **Claude Fable 5.1**, **Claude Opus 4.8**
-   - Amazon: **Nova 2 Lite**, **Nova Pro**, **Nova Premier**, **Nova Canvas**, **Nova Reel**
-   - Luma AI: **Ray 2** (enable in **us-west-2** too; Luma may not be offered in us-east-1)
-3. Anthropic models may show a short use-case form the first time. Fill it in; approval is usually immediate.
-4. Confirm each row reads **Access granted**.
+The old **Model access** page in the Bedrock console is retired. Serverless
+models are enabled automatically the first time your account invokes them.
+Two things still need a human:
+
+- **Anthropic models**: first-time users may be asked for use-case details.
+- **Marketplace-served models** (Luma Ray 2 and some partner models): the first
+  invoke must come from a principal with `aws-marketplace:Subscribe`.
+
+Trigger both from the playground, region **us-east-1**:
+
+1. Console → **Amazon Bedrock** → **Model catalog** → open **Claude Sonnet 5.5**
+   (or Opus 5.5) → **Open in playground** → send `hello`.
+   - A reply means Anthropic access is live.
+   - A **use case details** form means fill it in (company, "internal developer
+     assistant", team size) and submit; approval is normally immediate.
+   - An **AccessDenied** or Marketplace error means your IAM principal lacks
+     `aws-marketplace:Subscribe` or an SCP blocks Bedrock; an account admin fixes that.
+2. Repeat once with **Amazon Nova 2 Lite**. Nova Canvas, Nova Reel and Luma Ray 2
+   enable themselves on the app's first call.
+
+Administrators can still restrict models with IAM policies or Service Control Policies.
 
 Then verify from your laptop:
 
