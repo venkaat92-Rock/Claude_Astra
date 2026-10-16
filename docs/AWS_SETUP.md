@@ -27,7 +27,7 @@ availability in the Bedrock console for that region first.
 How the model families reach the app:
 
 - **Claude** — Bedrock's Messages-API endpoint (`bedrock-mantle`), via `@anthropic-ai/bedrock-sdk`'s `AnthropicBedrockMantle` client. Same request shape as Anthropic's API, SigV4 auth from the compute role.
-- **Amazon Nova (text)** — Bedrock Converse API via `@aws-sdk/client-bedrock-runtime`.
+- **OpenAI GPT-6 (Astra, 6.1 Sol, Sol, Luna) and Amazon Nova (text)** — Bedrock Converse API via `@aws-sdk/client-bedrock-runtime`, addressed through `global.`/`us.` inference-profile ids.
 - **Nova Canvas (image)** — Bedrock `InvokeModel`.
 - **Nova Reel / Luma Ray 2 (video)** — Bedrock `StartAsyncInvoke`; output lands in the media bucket.
 - **Gemini** — Google's Gen AI SDK with an AI Studio key. Gemini is not on Bedrock; only Google's open-weight Gemma models are.
