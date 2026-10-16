@@ -41,21 +41,27 @@ export function Panel({ models, modelId, onPickModel, refreshKey, onOpenFile }: 
 
   useEffect(load, [load, refreshKey]);
 
-  const chat = models.filter((m) => m.capabilities.includes("chat") || m.capabilities.includes("agent"));
-  const media = models.filter((m) => m.capabilities.includes("image") || m.capabilities.includes("video"));
+  const visible = models.filter((m) => m.status !== "retired");
+  const chat = visible.filter((m) => m.capabilities.includes("chat") || m.capabilities.includes("agent"));
+  const working = chat.filter((m) => m.status === "working");
+  const untested = chat.filter((m) => m.status !== "working");
+  const media = visible.filter((m) => m.capabilities.includes("image") || m.capabilities.includes("video"));
+
+  const row = (m: ModelInfo) => (
+    <div key={m.id} className={`m ${m.id === modelId ? "active" : ""} ${m.available ? "" : "off"}`} title={m.description} onClick={() => m.available && onPickModel(m.id)}>
+      <span className="v">{m.vendor}</span>
+      <span>{m.label}</span>
+      {!m.available && <span className="why">{m.reason}</span>}
+    </div>
+  );
 
   return (
     <aside className="panel">
-      <Section id="models" title="Models">
-        <div className="models">
-          {chat.map((m) => (
-            <div key={m.id} className={`m ${m.id === modelId ? "active" : ""} ${m.available ? "" : "off"}`} title={m.description} onClick={() => m.available && onPickModel(m.id)}>
-              <span className="v">{m.vendor}</span>
-              <span>{m.label}</span>
-              {!m.available && <span className="why">{m.reason}</span>}
-            </div>
-          ))}
-        </div>
+      <Section id="models-working" title="Tested & working">
+        <div className="models">{working.length ? working.map(row) : <div className="empty">none verified yet</div>}</div>
+      </Section>
+      <Section id="models-untested" title="Yet to work">
+        <div className="models">{untested.map(row)}</div>
       </Section>
       <Section id="media" title="Media models">
         <div className="models">

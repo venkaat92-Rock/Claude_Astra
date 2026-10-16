@@ -10,7 +10,9 @@ export interface ModelSpec {
   provider: ProviderKind;
   /**
    * Identifier passed to the underlying API:
-   * - anthropic-bedrock / OpenAI on Converse: bare `anthropic.*` / `openai.*` ids; the server prepends the routing prefix (ASTRA_CLAUDE_ROUTING, default `us.`)
+   * - anthropic-bedrock: bare `anthropic.*` id. Called through the Converse API by default
+   *   (ASTRA_CLAUDE_API=converse) or the Claude Messages endpoint (=messages); the server
+   *   prepends the routing prefix (ASTRA_CLAUDE_ROUTING, default `us.`). OpenAI ids likewise.
    * - bedrock-converse / bedrock-image / bedrock-video: Bedrock model id or inference profile id
    * - gemini: Gemini model name
    */
@@ -30,6 +32,11 @@ export interface ModelSpec {
   /** Shown in the UI; e.g. "requires GOOGLE_API_KEY". */
   notes?: string;
   enabled: boolean;
+  /**
+   * Verification status in the deployed app. "working" models are listed first;
+   * "untested" ones appear under "Yet to work"; "retired" ones are hidden from pickers.
+   */
+  status?: "working" | "untested" | "retired";
 }
 
 /**
@@ -122,6 +129,7 @@ export const DEFAULT_MODELS: ModelSpec[] = [
     defaults: { maxTokens: 8_000 },
     notes: "Inference-profile id (us.). Use global.amazon.nova-2-lite-v1:0 for global routing.",
     enabled: true,
+    status: "working",
   },
   {
     id: "nova-pro",
@@ -134,6 +142,7 @@ export const DEFAULT_MODELS: ModelSpec[] = [
     contextWindow: 300_000,
     defaults: { maxTokens: 5_000 },
     enabled: true,
+    status: "working",
   },
   {
     id: "nova-premier",
@@ -142,10 +151,11 @@ export const DEFAULT_MODELS: ModelSpec[] = [
     provider: "bedrock-converse",
     apiModelId: "us.amazon.nova-premier-v1:0",
     capabilities: ["chat", "tools", "vision"],
-    description: "Largest Nova 1 model; teacher model for distillation.",
+    description: "Largest Nova 1 model. Retired by Amazon; kept for reference.",
     contextWindow: 1_000_000,
     defaults: { maxTokens: 8_000 },
-    enabled: true,
+    enabled: false,
+    status: "retired",
   },
 
   // ---------------- Image / video generation (used by agent tools and /image, /video) ----------------
@@ -196,6 +206,7 @@ export const DEFAULT_MODELS: ModelSpec[] = [
     defaults: { maxTokens: 32_000 },
     notes: "Converse requires an inference-profile prefix; the server prepends ASTRA_CLAUDE_ROUTING (default us.).",
     enabled: true,
+    status: "working",
   },
   {
     id: "gpt-6-1-sol",
@@ -301,7 +312,7 @@ export const DEFAULT_MODELS: ModelSpec[] = [
   },
 ];
 
-export const DEFAULT_MODEL_ID = "claude-opus-5-5";
+export const DEFAULT_MODEL_ID = "gpt-6-astra";
 
 export function findModel(models: ModelSpec[], id: string): ModelSpec | undefined {
   return models.find((m) => m.id === id);
