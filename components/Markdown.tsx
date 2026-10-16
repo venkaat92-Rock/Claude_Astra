@@ -1,44 +1,41 @@
 "use client";
 
-import { Fragment } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
-/** Minimal, dependency-free markdown: fenced code, inline code, bold. */
+/**
+ * GitHub-flavoured markdown (tables, task lists, strikethrough, autolinks).
+ * react-markdown renders to React elements and never injects raw HTML, so
+ * model output is safe to display as-is.
+ */
 export function Markdown({ text }: { text: string }) {
-  const chunks = text.split(/(```[\s\S]*?```|```[\s\S]*$)/g);
   return (
     <div className="md">
-      {chunks.map((chunk, i) => {
-        if (chunk.startsWith("```")) {
-          const body = chunk.replace(/^```/, "").replace(/```$/, "");
-          const nl = body.indexOf("\n");
-          const lang = nl >= 0 ? body.slice(0, nl).trim() : "";
-          const code = nl >= 0 ? body.slice(nl + 1) : body;
-          return (
-            <pre key={i}>
-              {lang && <span className="lang">{lang}</span>}
-              <code>{code.replace(/\n$/, "")}</code>
-            </pre>
-          );
-        }
-        return <Fragment key={i}>{inline(chunk)}</Fragment>;
-      })}
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          a: ({ href, children }) => (
+            <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>
+          ),
+          pre: ({ children }) => <pre>{children}</pre>,
+          code: ({ className, children, ...rest }) => {
+            const lang = /language-(\w+)/.exec(className ?? "")?.[1];
+            const inline = !className && !String(children).includes("\n");
+            if (inline) return <code {...rest}>{children}</code>;
+            return (
+              <>
+                {lang && <span className="lang">{lang}</span>}
+                <code className={className}>{children}</code>
+              </>
+            );
+          },
+          table: ({ children }) => (
+            <div className="table-wrap"><table>{children}</table></div>
+          ),
+        }}
+      >
+        {text}
+      </ReactMarkdown>
     </div>
   );
-}
-
-function inline(text: string): React.ReactNode[] {
-  const out: React.ReactNode[] = [];
-  const re = /(`[^`\n]+`|\*\*[^*\n]+\*\*)/g;
-  let last = 0;
-  let m: RegExpExecArray | null;
-  let k = 0;
-  while ((m = re.exec(text))) {
-    if (m.index > last) out.push(text.slice(last, m.index));
-    const tok = m[0];
-    if (tok.startsWith("`")) out.push(<code key={k++}>{tok.slice(1, -1)}</code>);
-    else out.push(<b key={k++}>{tok.slice(2, -2)}</b>);
-    last = m.index + tok.length;
-  }
-  if (last < text.length) out.push(text.slice(last));
-  return out;
 }
