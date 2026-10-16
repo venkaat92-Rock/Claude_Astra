@@ -13,6 +13,8 @@ export interface ServerConfig {
   claudeFallbackModel?: string;
   /** Routing prefix for Claude and OpenAI ids on Bedrock: "us." (default), "eu.", "jp.", "au.", "global." or "" (ASTRA_CLAUDE_ROUTING=none) for in-region only. */
   claudeRoutingPrefix: string;
+  /** How Claude is called: "converse" (Bedrock Converse API, default) or "messages" (Claude Messages-API endpoint, bedrock-mantle). */
+  claudeApi: "converse" | "messages";
   authMode: "cognito" | "none";
   defaultModelId: string;
 }
@@ -48,6 +50,7 @@ export function serverConfig(): ServerConfig {
     bedrockAgentAliasId: process.env.BEDROCK_AGENT_ALIAS_ID,
     claudeFallbackModel: process.env.ASTRA_CLAUDE_FALLBACK_MODEL,
     claudeRoutingPrefix: normalizePrefix(process.env.ASTRA_CLAUDE_ROUTING ?? "us"),
+    claudeApi: process.env.ASTRA_CLAUDE_API === "messages" ? "messages" : "converse",
     authMode,
     defaultModelId: process.env.ASTRA_DEFAULT_MODEL || DEFAULT_MODEL_ID,
   };
@@ -98,6 +101,7 @@ export function modelCatalog(): ModelSpec[] {
 /** Attach runtime availability (missing keys, missing agent ids) to each model. */
 export function modelAvailability(m: ModelSpec): { available: boolean; reason?: string } {
   const cfg = serverConfig();
+  if (m.status === "retired") return { available: false, reason: "retired by the provider" };
   if (!m.enabled) return { available: false, reason: m.notes ?? "disabled" };
   if (m.provider === "gemini" && !cfg.googleApiKey) return { available: false, reason: "GOOGLE_API_KEY not set" };
   if (m.provider === "bedrock-agent" && !(cfg.bedrockAgentId && cfg.bedrockAgentAliasId)) {

@@ -115,7 +115,9 @@ export function Terminal() {
     [send, pushLine, newConversation, models, model, modelId, setModelId, setEffort, openFile, openList, toggleTheme],
   );
 
-  const chatModels = models.filter((m) => m.capabilities.includes("chat") || m.capabilities.includes("agent"));
+  const chatModels = models.filter((m) => m.status !== "retired" && (m.capabilities.includes("chat") || m.capabilities.includes("agent")));
+  const workingModels = chatModels.filter((m) => m.status === "working");
+  const untestedModels = chatModels.filter((m) => m.status !== "working");
 
   return (
     <div className={`astra ${hideSidebar ? "no-sidebar" : ""} ${hidePanel ? "no-panel" : ""}`}>
@@ -123,10 +125,13 @@ export function Terminal() {
         <button className="icon" title={hideSidebar ? "Show chats" : "Hide chats"} onClick={() => setHideSidebar((v) => !v)}>☰</button>
         <span className="astra-logo">✦ Claude Astra <span>· Bedrock agent workbench</span></span>
         <span className="spacer" />
-        <select value={modelId} onChange={(e) => setModelId(e.target.value)} style={{ padding: "3px 8px", maxWidth: 260 }} title="Model">
-          {chatModels.map((m) => (
-            <option key={m.id} value={m.id} disabled={!m.available}>{m.label}{m.available ? "" : " (unavailable)"}</option>
-          ))}
+        <select value={modelId} onChange={(e) => setModelId(e.target.value)} style={{ padding: "3px 8px", maxWidth: 280 }} title="Model">
+          <optgroup label="Tested & working">
+            {workingModels.map((m) => <option key={m.id} value={m.id} disabled={!m.available}>{m.label}{m.available ? "" : " (unavailable)"}</option>)}
+          </optgroup>
+          <optgroup label="Yet to work">
+            {untestedModels.map((m) => <option key={m.id} value={m.id} disabled={!m.available}>{m.label}{m.available ? "" : " (unavailable)"}</option>)}
+          </optgroup>
         </select>
         {model?.capabilities.includes("thinking") && model.provider === "anthropic-bedrock" && (
           <select value={effort ?? model.defaults?.effort ?? "high"} onChange={(e) => setEffort(e.target.value as Effort)} style={{ padding: "3px 8px" }} title="Reasoning effort">

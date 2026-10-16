@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { ModelSpec } from "@/lib/models";
-import type { AstraEvent, AstraMessage, AstraPart, Effort } from "@/lib/types";
+import type { AstraEvent, AstraMessage, AstraPart, Effort, ProviderKind } from "@/lib/types";
+import { serverConfig } from "../config";
 import { anthropicBedrockProvider } from "../providers/anthropic-bedrock";
 import { bedrockAgentProvider } from "../providers/bedrock-agent";
 import { bedrockConverseProvider } from "../providers/bedrock-converse";
@@ -11,12 +12,18 @@ import { TOOL_DEFS, executeTool, type ToolContext, type ToolDef } from "./tools"
 
 export const MAX_ITERATIONS = 30;
 
-export function providerFor(model: ModelSpec, sessionId: string): ChatProvider {
+/** Resolve the provider that will actually serve this model, and the kind to stamp on its turns. */
+export function providerFor(model: ModelSpec, sessionId: string): { provider: ChatProvider; kind: ProviderKind } {
   switch (model.provider) {
-    case "anthropic-bedrock": return anthropicBedrockProvider;
-    case "bedrock-converse": return bedrockConverseProvider;
-    case "gemini": return geminiProvider;
-    case "bedrock-agent": return bedrockAgentProvider(sessionId);
+    case "anthropic-bedrock":
+      // Claude goes through the Converse API unless ASTRA_CLAUDE_API=messages selects the
+      // Claude Messages endpoint (bedrock-mantle). Converse is what most accounts permit.
+      return serverConfig().claudeApi === "messages"
+        ? { provider: anthropicBedrockProvider, kind: "anthropic-bedrock" }
+        : { provider: bedrockConverseProvider, kind: "bedrock-converse" };
+    case "bedrock-converse": return { provider: bedrockConverseProvider, kind: "bedrock-converse" };
+    case "gemini": return { provider: geminiProvider, kind: "gemini" };
+    case "bedrock-agent": return { provider: bedrockAgentProvider(sessionId), kind: "bedrock-agent" };
     default: throw new Error(`Model ${model.id} (${model.provider}) is not a chat provider`);
   }
 }
@@ -36,7 +43,7 @@ export interface AgentRunOptions {
  */
 export async function* runAgent(opts: AgentRunOptions): AsyncGenerator<AstraEvent, void, unknown> {
   const { model, ctx } = opts;
-  const provider = providerFor(model, opts.sessionId);
+  const { provider, kind } = providerFor(model, opts.sessionId);
   const supportsTools = model.capabilities.includes("tools");
   const tools = supportsTools ? (opts.tools ?? TOOL_DEFS) : [];
   const history: AstraMessage[] = [...opts.messages];
@@ -47,7 +54,7 @@ export async function* runAgent(opts: AgentRunOptions): AsyncGenerator<AstraEven
       return;
     }
     const messageId = randomUUID();
-    yield { type: "turn_start", messageId, modelId: model.id, provider: model.provider };
+    yield { type: "turn_start", messageId, modelId: model.id, provider: kind };
 
     const gen = provider.streamTurn({
       model,
@@ -72,7 +79,7 @@ export async function* runAgent(opts: AgentRunOptions): AsyncGenerator<AstraEven
       id: messageId,
       role: "assistant",
       parts: result.parts,
-      provider: model.provider,
+      provider: kind,
       modelId: model.id,
       raw: result.raw,
       createdAt: new Date().toISOString(),

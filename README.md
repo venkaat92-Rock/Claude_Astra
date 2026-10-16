@@ -51,6 +51,16 @@ Follow [`docs/AWS_SETUP.md`](docs/AWS_SETUP.md). Short version:
 4. Set `ASTRA_MEDIA_BUCKET` (+ `GOOGLE_API_KEY`, `BEDROCK_AGENT_ID` if used) as environment variables. Don't set `AWS_REGION`; Amplify reserves the `AWS` prefix.
 5. Redeploy, sign up, type `/help`.
 
+## Model status
+
+The model picker shows two groups. **Tested & working** lists models confirmed end to end in the deployed app; **Yet to work** lists the rest of the catalog. Status lives in `lib/models.ts` (`status: "working" | "untested" | "retired"`); move a model up once you've seen it answer.
+
+| Status | Models |
+|---|---|
+| Tested & working | OpenAI GPT-6 Astra, Amazon Nova 2 Lite, Amazon Nova Pro |
+| Yet to work | Claude Opus 5.5 / Fable 5.1 / Sonnet 5.5 / Haiku 5.5 / Opus 4.8 (now routed via Converse), GPT-6.1 Sol, GPT-6 Sol, GPT-6 Luna, Gemini (needs `GOOGLE_API_KEY`), Bedrock Agent (needs ids), Nova Canvas, Nova Reel, Luma Ray 2 (need `ASTRA_BEDROCK_REGION` / `ASTRA_MEDIA_BUCKET`) |
+| Retired | Amazon Nova Premier |
+
 ## Slash commands
 
 ```
