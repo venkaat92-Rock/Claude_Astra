@@ -57,7 +57,7 @@ The model picker shows two groups. **Tested & working** lists models confirmed e
 
 | Status | Models |
 |---|---|
-| Tested & working | OpenAI GPT-6 Astra, Amazon Nova 2 Lite, Amazon Nova Pro |
+| Tested & working (priority order) | OpenAI GPT-6 Astra, Claude Opus 4.5, Claude Haiku 4.5, Amazon Nova 2 Lite, Claude Sonnet 4.5, Mistral Pixtral Large, Meta Llama 4 Maverick, Meta Llama 4 Scout, Amazon Nova Pro. GPT-6 Astra and the Nova models were confirmed in this app; the rest were verified through the same Converse API in the same AWS account by the DiagramIQ project |
 | Yet to work | Claude Opus 5.5 / Fable 5.1 / Sonnet 5.5 / Haiku 5.5 / Opus 4.8 (now routed via Converse), GPT-6.1 Sol, GPT-6 Sol, GPT-6 Luna, Gemini (needs `GOOGLE_API_KEY`), Bedrock Agent (needs ids), Nova Canvas, Nova Reel, Luma Ray 2 (need `ASTRA_BEDROCK_REGION` / `ASTRA_MEDIA_BUCKET`) |
 | Retired | Amazon Nova Premier |
 

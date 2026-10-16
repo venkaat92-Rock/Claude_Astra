@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { ModelInfo } from "@/lib/client/useAstra";
+import { byPriority } from "@/lib/models";
 import { usePref } from "@/lib/client/useTheme";
 
 interface FileRow { path: string; size: number; modified?: string }
@@ -43,7 +44,7 @@ export function Panel({ models, modelId, onPickModel, refreshKey, onOpenFile }: 
 
   const visible = models.filter((m) => m.status !== "retired");
   const chat = visible.filter((m) => m.capabilities.includes("chat") || m.capabilities.includes("agent"));
-  const working = chat.filter((m) => m.status === "working");
+  const working = chat.filter((m) => m.status === "working").sort(byPriority);
   const untested = chat.filter((m) => m.status !== "working");
   const media = visible.filter((m) => m.capabilities.includes("image") || m.capabilities.includes("video"));
 

@@ -6,6 +6,7 @@ import { EFFORTS, HELP_TEXT, parseSlash } from "@/lib/client/slash-commands";
 import { partsForSend, type Attachment } from "@/lib/client/attachments";
 import { usePref, useTheme } from "@/lib/client/useTheme";
 import type { Effort } from "@/lib/types";
+import { byPriority } from "@/lib/models";
 import { Composer } from "./Composer";
 import { Panel } from "./Panel";
 import { Sidebar } from "./Sidebar";
@@ -116,7 +117,7 @@ export function Terminal() {
   );
 
   const chatModels = models.filter((m) => m.status !== "retired" && (m.capabilities.includes("chat") || m.capabilities.includes("agent")));
-  const workingModels = chatModels.filter((m) => m.status === "working");
+  const workingModels = chatModels.filter((m) => m.status === "working").sort(byPriority);
   const untestedModels = chatModels.filter((m) => m.status !== "working");
 
   return (
