@@ -1,9 +1,9 @@
 # ✦ Claude Astra
 
 A Claude Code-style agent workbench you host yourself: a terminal-like web UI on
-**AWS Amplify**, with **Amazon Bedrock** behind it for **Claude**, **Amazon Nova**
-(text, image, video), **Luma Ray 2** video and **Bedrock Agents**, plus optional
-**Google Gemini** through Google's API.
+**AWS Amplify**, with **Amazon Bedrock** behind it for **Claude**, **OpenAI GPT-6**
+(Astra, 6.1 Sol, Sol, Luna), **Amazon Nova** (text, image, video), **Luma Ray 2**
+video and **Bedrock Agents**, plus optional **Google Gemini** through Google's API.
 
 ```
 ❯ create a FastAPI hello-world in api/main.py and a Dockerfile for it
