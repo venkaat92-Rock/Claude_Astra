@@ -145,6 +145,7 @@ Amplify → **App settings** → **Environment variables** → add:
 | `ASTRA_BEDROCK_REGION` | `us-east-1` | yes if the app is hosted outside us-east-1 (Nova Canvas is only served there) |
 | `ASTRA_MEDIA_BUCKET` | `mediaBucketName` from step 5 | for video |
 | `ASTRA_MEDIA_PREFIX` | `videos/` | no |
+| `ASTRA_CLAUDE_ROUTING` | `global` (default), `us`, or empty for in-region | no. Claude ids on Bedrock are routed through a prefix (`global.anthropic.…`); a bare id is in-region only and returns "model does not exist" where that isn't offered |
 | `ASTRA_DEFAULT_MODEL` | `claude-opus-5-5` | no |
 | `ASTRA_CLAUDE_FALLBACK_MODEL` | `anthropic.claude-opus-4-8` | no (client-side fallback when Claude returns `stop_reason: refusal`) |
 | `GOOGLE_API_KEY` | key from https://aistudio.google.com/apikey | for Gemini |

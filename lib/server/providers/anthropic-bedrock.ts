@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { AnthropicBedrockMantle } from "@anthropic-ai/bedrock-sdk";
 import { betaRefusalFallbackMiddleware } from "@anthropic-ai/sdk/lib/middleware";
 import type { AstraEvent, AstraMessage, AstraPart } from "@/lib/types";
-import { serverConfig } from "../config";
+import { bedrockClaudeModelId, serverConfig } from "../config";
 import { parseToolInput, type ChatProvider, type TurnRequest, type TurnResult } from "./types";
 
 let client: AnthropicBedrockMantle | undefined;
@@ -18,7 +18,7 @@ function getClient(): AnthropicBedrockMantle {
     awsRegion: cfg.region,
     // Bedrock has no server-side `fallbacks`; the SDK middleware re-issues a refused
     // request on the fallback model client-side when ASTRA_CLAUDE_FALLBACK_MODEL is set.
-    middleware: cfg.claudeFallbackModel ? [betaRefusalFallbackMiddleware([{ model: cfg.claudeFallbackModel }])] : undefined,
+    middleware: cfg.claudeFallbackModel ? [betaRefusalFallbackMiddleware([{ model: bedrockClaudeModelId(cfg.claudeFallbackModel) }])] : undefined,
   });
   return client;
 }
@@ -79,7 +79,7 @@ export const anthropicBedrockProvider: ChatProvider = {
     }));
 
     const params: Anthropic.MessageStreamParams = {
-      model: model.apiModelId,
+      model: bedrockClaudeModelId(model.apiModelId),
       max_tokens: req.maxTokens ?? defaults.maxTokens ?? 32_000,
       system: req.system,
       messages: toAnthropicMessages(req.messages, model.id),

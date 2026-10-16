@@ -13,7 +13,9 @@ import { GetCallerIdentityCommand, STSClient } from "@aws-sdk/client-sts";
 import { DEFAULT_MODELS } from "../lib/models";
 
 const region = process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? "us-east-1";
-const claudeId = process.argv[2] ?? DEFAULT_MODELS.find((m) => m.id === "claude-opus-5-5")!.apiModelId;
+const routing = process.env.ASTRA_CLAUDE_ROUTING;
+const prefix = routing === undefined ? "global." : routing.trim() ? routing.trim().replace(/\.$/, "") + "." : "";
+const claudeId = process.argv[2] ?? prefix + DEFAULT_MODELS.find((m) => m.id === "claude-opus-5-5")!.apiModelId;
 const novaId = DEFAULT_MODELS.find((m) => m.id === "nova-2-lite")!.apiModelId;
 
 async function step(name: string, fn: () => Promise<string | void>) {
