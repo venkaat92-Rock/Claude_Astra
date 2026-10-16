@@ -10,7 +10,7 @@ export interface ModelSpec {
   provider: ProviderKind;
   /**
    * Identifier passed to the underlying API:
-   * - anthropic-bedrock: `anthropic.claude-*` (global routing by default)
+   * - anthropic-bedrock: `anthropic.claude-*`; the server prepends the routing prefix (ASTRA_CLAUDE_ROUTING, default `global.`)
    * - bedrock-converse / bedrock-image / bedrock-video: Bedrock model id or inference profile id
    * - gemini: Gemini model name
    */
