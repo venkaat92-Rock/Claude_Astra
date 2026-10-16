@@ -6,7 +6,7 @@ export interface ModelSpec {
   /** Stable id used by the UI and API (never changes when Bedrock ids rotate). */
   id: string;
   label: string;
-  vendor: "Anthropic" | "Amazon" | "Google" | "Luma" | "OpenAI";
+  vendor: "Anthropic" | "Amazon" | "Google" | "Luma" | "OpenAI" | "Mistral" | "Meta";
   provider: ProviderKind;
   /**
    * Identifier passed to the underlying API:
@@ -37,6 +37,8 @@ export interface ModelSpec {
    * "untested" ones appear under "Yet to work"; "retired" ones are hidden from pickers.
    */
   status?: "working" | "untested" | "retired";
+  /** Display order inside the "Tested & working" group (lower first). */
+  priority?: number;
 }
 
 /**
@@ -115,6 +117,94 @@ export const DEFAULT_MODELS: ModelSpec[] = [
     enabled: true,
   },
 
+  // ---------------- Verified in DiagramIQ (same account, Converse API, us-west-2) ----------------
+  {
+    id: "claude-opus-4-5",
+    label: "Claude Opus 4.5",
+    vendor: "Anthropic",
+    provider: "anthropic-bedrock",
+    apiModelId: "us.anthropic.claude-opus-4-5-20251101-v1:0",
+    capabilities: ["chat", "tools", "vision", "thinking"],
+    description: "Best quality in DiagramIQ testing. Dated inference-profile id; served through Converse.",
+    contextWindow: 200_000,
+    defaults: { maxTokens: 16_000, thinking: "budget" },
+    notes: "DiagramIQ priority 1.",
+    enabled: true,
+    status: "working",
+    priority: 2,
+  },
+  {
+    id: "claude-haiku-4-5",
+    label: "Claude Haiku 4.5",
+    vendor: "Anthropic",
+    provider: "anthropic-bedrock",
+    apiModelId: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+    capabilities: ["chat", "tools", "vision"],
+    description: "Fast and close to Opus on routine work.",
+    contextWindow: 200_000,
+    defaults: { maxTokens: 8_000, thinking: "none" },
+    notes: "DiagramIQ priority 2.",
+    enabled: true,
+    status: "working",
+    priority: 3,
+  },
+  {
+    id: "claude-sonnet-4-5",
+    label: "Claude Sonnet 4.5",
+    vendor: "Anthropic",
+    provider: "anthropic-bedrock",
+    apiModelId: "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    capabilities: ["chat", "tools", "vision"],
+    description: "Strong middle tier.",
+    contextWindow: 200_000,
+    defaults: { maxTokens: 8_000, thinking: "none" },
+    enabled: true,
+    status: "working",
+    priority: 5,
+  },
+  {
+    id: "pixtral-large",
+    label: "Mistral Pixtral Large",
+    vendor: "Mistral",
+    provider: "bedrock-converse",
+    apiModelId: "us.mistral.pixtral-large-2502-v1:0",
+    capabilities: ["chat", "tools", "vision"],
+    description: "Strong on diagrams and images.",
+    contextWindow: 128_000,
+    defaults: { maxTokens: 8_000 },
+    enabled: true,
+    status: "working",
+    priority: 6,
+  },
+  {
+    id: "llama4-maverick",
+    label: "Meta Llama 4 Maverick",
+    vendor: "Meta",
+    provider: "bedrock-converse",
+    apiModelId: "us.meta.llama4-maverick-17b-instruct-v1:0",
+    capabilities: ["chat", "tools", "vision"],
+    description: "Strong open-weight multimodal model.",
+    contextWindow: 1_000_000,
+    defaults: { maxTokens: 8_000 },
+    enabled: true,
+    status: "working",
+    priority: 7,
+  },
+  {
+    id: "llama4-scout",
+    label: "Meta Llama 4 Scout",
+    vendor: "Meta",
+    provider: "bedrock-converse",
+    apiModelId: "us.meta.llama4-scout-17b-instruct-v1:0",
+    capabilities: ["chat", "tools", "vision"],
+    description: "Lighter Llama 4.",
+    contextWindow: 3_500_000,
+    defaults: { maxTokens: 8_000 },
+    enabled: true,
+    status: "working",
+    priority: 8,
+  },
+
   // ---------------- Amazon Nova (Converse API) ----------------
   {
     id: "nova-2-lite",
@@ -130,6 +220,7 @@ export const DEFAULT_MODELS: ModelSpec[] = [
     notes: "Inference-profile id (us.). Use global.amazon.nova-2-lite-v1:0 for global routing.",
     enabled: true,
     status: "working",
+    priority: 4,
   },
   {
     id: "nova-pro",
@@ -143,6 +234,7 @@ export const DEFAULT_MODELS: ModelSpec[] = [
     defaults: { maxTokens: 5_000 },
     enabled: true,
     status: "working",
+    priority: 9,
   },
   {
     id: "nova-premier",
@@ -207,6 +299,7 @@ export const DEFAULT_MODELS: ModelSpec[] = [
     notes: "Converse requires an inference-profile prefix; the server prepends ASTRA_CLAUDE_ROUTING (default us.).",
     enabled: true,
     status: "working",
+    priority: 1,
   },
   {
     id: "gpt-6-1-sol",
@@ -312,10 +405,15 @@ export const DEFAULT_MODELS: ModelSpec[] = [
   },
 ];
 
-export const DEFAULT_MODEL_ID = "gpt-6-astra";
+export const DEFAULT_MODEL_ID = "claude-opus-4-5";
 
 export function findModel(models: ModelSpec[], id: string): ModelSpec | undefined {
   return models.find((m) => m.id === id);
+}
+
+/** Working models first by priority, then the rest in catalog order. */
+export function byPriority(a: ModelSpec, b: ModelSpec): number {
+  return (a.priority ?? 1_000) - (b.priority ?? 1_000);
 }
 
 export function isChatModel(m: ModelSpec): boolean {
