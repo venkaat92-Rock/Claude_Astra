@@ -10,7 +10,7 @@ export interface ModelSpec {
   provider: ProviderKind;
   /**
    * Identifier passed to the underlying API:
-   * - anthropic-bedrock: `anthropic.claude-*`; the server prepends the routing prefix (ASTRA_CLAUDE_ROUTING, default `global.`)
+   * - anthropic-bedrock / OpenAI on Converse: bare `anthropic.*` / `openai.*` ids; the server prepends the routing prefix (ASTRA_CLAUDE_ROUTING, default `us.`)
    * - bedrock-converse / bedrock-image / bedrock-video: Bedrock model id or inference profile id
    * - gemini: Gemini model name
    */
@@ -189,12 +189,12 @@ export const DEFAULT_MODELS: ModelSpec[] = [
     label: "OpenAI GPT-6 Astra",
     vendor: "OpenAI",
     provider: "bedrock-converse",
-    apiModelId: "global.openai.gpt-6-astra",
+    apiModelId: "openai.gpt-6-astra",
     capabilities: ["chat", "tools", "vision", "thinking"],
     description: "OpenAI's most capable GPT-6 model on Bedrock: hybrid reasoning, tool use, 1M context.",
     contextWindow: 1_000_000,
     defaults: { maxTokens: 32_000 },
-    notes: "Bedrock model id openai.gpt-6-astra; Converse requires the global. or us. inference-profile prefix.",
+    notes: "Converse requires an inference-profile prefix; the server prepends ASTRA_CLAUDE_ROUTING (default us.).",
     enabled: true,
   },
   {
@@ -202,7 +202,7 @@ export const DEFAULT_MODELS: ModelSpec[] = [
     label: "OpenAI GPT-6.1 Sol",
     vendor: "OpenAI",
     provider: "bedrock-converse",
-    apiModelId: "global.openai.gpt-6.1-sol",
+    apiModelId: "openai.gpt-6.1-sol",
     capabilities: ["chat", "tools", "vision", "thinking"],
     description: "GPT-6.1 Sol: near-Astra capability at Sol pricing; strong on coding and agentic work.",
     contextWindow: 1_000_000,
@@ -215,7 +215,7 @@ export const DEFAULT_MODELS: ModelSpec[] = [
     label: "OpenAI GPT-6 Sol",
     vendor: "OpenAI",
     provider: "bedrock-converse",
-    apiModelId: "global.openai.gpt-6-sol",
+    apiModelId: "openai.gpt-6-sol",
     capabilities: ["chat", "tools", "vision", "thinking"],
     description: "GPT-6 Sol: balanced performance and cost.",
     contextWindow: 1_000_000,
@@ -227,7 +227,7 @@ export const DEFAULT_MODELS: ModelSpec[] = [
     label: "OpenAI GPT-6 Luna",
     vendor: "OpenAI",
     provider: "bedrock-converse",
-    apiModelId: "global.openai.gpt-6-luna",
+    apiModelId: "openai.gpt-6-luna",
     capabilities: ["chat", "tools", "vision", "thinking"],
     description: "GPT-6 Luna: fastest and cheapest of the GPT-6 family.",
     contextWindow: 1_000_000,

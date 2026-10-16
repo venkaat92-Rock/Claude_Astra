@@ -14,7 +14,8 @@ import { DEFAULT_MODELS } from "../lib/models";
 
 const region = process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? "us-east-1";
 const routing = process.env.ASTRA_CLAUDE_ROUTING;
-const prefix = routing === undefined ? "global." : routing.trim() ? routing.trim().replace(/\.$/, "") + "." : "";
+const r = (routing ?? "us").trim().replace(/\.$/, "").toLowerCase();
+const prefix = !r || r === "none" || r === "bare" ? "" : r + ".";
 const claudeId = process.argv[2] ?? prefix + DEFAULT_MODELS.find((m) => m.id === "claude-opus-5-5")!.apiModelId;
 const novaId = DEFAULT_MODELS.find((m) => m.id === "nova-2-lite")!.apiModelId;
 

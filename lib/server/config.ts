@@ -11,7 +11,7 @@ export interface ServerConfig {
   bedrockAgentId?: string;
   bedrockAgentAliasId?: string;
   claudeFallbackModel?: string;
-  /** Routing prefix for Claude ids on Bedrock: "global." (default), "us.", "eu.", "jp.", "au." or "" for in-region only. */
+  /** Routing prefix for Claude and OpenAI ids on Bedrock: "us." (default), "eu.", "jp.", "au.", "global." or "" (ASTRA_CLAUDE_ROUTING=none) for in-region only. */
   claudeRoutingPrefix: string;
   authMode: "cognito" | "none";
   defaultModelId: string;
@@ -47,27 +47,29 @@ export function serverConfig(): ServerConfig {
     bedrockAgentId: process.env.BEDROCK_AGENT_ID,
     bedrockAgentAliasId: process.env.BEDROCK_AGENT_ALIAS_ID,
     claudeFallbackModel: process.env.ASTRA_CLAUDE_FALLBACK_MODEL,
-    claudeRoutingPrefix: process.env.ASTRA_CLAUDE_ROUTING === undefined ? "global." : normalizePrefix(process.env.ASTRA_CLAUDE_ROUTING),
+    claudeRoutingPrefix: normalizePrefix(process.env.ASTRA_CLAUDE_ROUTING ?? "us"),
     authMode,
     defaultModelId: process.env.ASTRA_DEFAULT_MODEL || DEFAULT_MODEL_ID,
   };
   return cached;
 }
 
-/** "global" | "global." | "" -> "global." | "global." | "" */
+/** "us" | "us." -> "us."; "" | "none" | "bare" -> "" (in-region id, no prefix). */
 function normalizePrefix(v: string): string {
-  const t = v.trim().replace(/\.$/, "");
-  return t ? `${t}.` : "";
+  const t = v.trim().replace(/\.$/, "").toLowerCase();
+  if (!t || t === "none" || t === "bare") return "";
+  return `${t}.`;
 }
 
 /**
- * Bedrock addresses Claude through routing prefixes: `global.anthropic.…` routes
- * across all regions (no premium), `us.anthropic.…` within a geography, and a
- * bare `anthropic.…` id is in-region only, which many regions do not offer.
+ * Bedrock addresses Claude and OpenAI models through inference-profile prefixes:
+ * `us.…` routes within the US geography (default here), `global.…` across every
+ * region (often blocked by region-restricting organization policies, and not
+ * accepted by the Claude endpoint), and a bare id is in-region only.
  * Ids that already carry a prefix are left alone.
  */
 export function bedrockClaudeModelId(apiModelId: string): string {
-  if (!apiModelId.startsWith("anthropic.")) return apiModelId;
+  if (!/^(anthropic|openai)\./.test(apiModelId)) return apiModelId;
   return serverConfig().claudeRoutingPrefix + apiModelId;
 }
 
