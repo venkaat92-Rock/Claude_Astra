@@ -9,7 +9,7 @@ import {
   type DocumentFormat,
 } from "@aws-sdk/client-bedrock-runtime";
 import type { AstraEvent, AstraMessage, AstraPart } from "@/lib/types";
-import { serverConfig } from "../config";
+import { bedrockClaudeModelId, serverConfig } from "../config";
 import { parseToolInput, type ChatProvider, type TurnRequest, type TurnResult } from "./types";
 
 type JsonDoc = ToolInputSchema.JsonMember["json"];
@@ -84,7 +84,7 @@ export const bedrockConverseProvider: ChatProvider = {
 
     const res = await getClient().send(
       new ConverseStreamCommand({
-        modelId: model.apiModelId,
+        modelId: bedrockClaudeModelId(model.apiModelId),
         system: [{ text: req.system }],
         messages: toConverseMessages(req.messages),
         inferenceConfig: { maxTokens: req.maxTokens ?? model.defaults?.maxTokens ?? 8_000 },
