@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAstra } from "@/lib/client/useAstra";
 import { EFFORTS, HELP_TEXT, parseSlash } from "@/lib/client/slash-commands";
 import { partsForSend, type Attachment } from "@/lib/client/attachments";
-import { usePref, useTheme } from "@/lib/client/useTheme";
+import { useMediaQuery, usePref, useTheme } from "@/lib/client/useTheme";
 import type { Effort } from "@/lib/types";
 import { byPriority } from "@/lib/models";
 import { Composer } from "./Composer";
@@ -23,6 +23,16 @@ export function Terminal() {
   const [hideSidebar, setHideSidebar] = usePref("hide-sidebar", false);
   const [hidePanel, setHidePanel] = usePref("hide-panel", false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const mobile = useMediaQuery("(max-width: 900px)");
+  const [drawer, setDrawer] = useState<"left" | "right" | null>(null);
+  const toggleLeft = () => (mobile ? setDrawer((d) => (d === "left" ? null : "left")) : setHideSidebar((v) => !v));
+  const toggleRight = () => (mobile ? setDrawer((d) => (d === "right" ? null : "right")) : setHidePanel((v) => !v));
+  useEffect(() => {
+    if (!drawer) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setDrawer(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [drawer]);
   const modelLabels = useMemo(() => Object.fromEntries(models.map((m) => [m.id, m.label])), [models]);
 
   // Refresh the workspace panel whenever a run finishes (tools may have written files).
@@ -121,9 +131,9 @@ export function Terminal() {
   const untestedModels = chatModels.filter((m) => m.status !== "working");
 
   return (
-    <div className={`astra ${hideSidebar ? "no-sidebar" : ""} ${hidePanel ? "no-panel" : ""}`}>
+    <div className={`astra ${hideSidebar ? "no-sidebar" : ""} ${hidePanel ? "no-panel" : ""} ${drawer === "left" ? "drawer-left" : ""} ${drawer === "right" ? "drawer-right" : ""}`}>
       <header className="astra-header">
-        <button className="icon" title={hideSidebar ? "Show chats" : "Hide chats"} onClick={() => setHideSidebar((v) => !v)}>☰</button>
+        <button className="icon" title="Chats" aria-label="Toggle chat list" onClick={toggleLeft}>☰</button>
         <span className="astra-logo">✦ Claude Astra <span>· Bedrock agent workbench</span></span>
         <span className="spacer" />
         <select value={modelId} onChange={(e) => setModelId(e.target.value)} style={{ padding: "3px 8px", maxWidth: 280 }} title="Model">
@@ -140,14 +150,22 @@ export function Terminal() {
           </select>
         )}
         <button className="icon" onClick={toggleTheme} title="Toggle light/dark">{theme === "light" ? "☾" : "☀"}</button>
-        <button className="icon" title={hidePanel ? "Show models & workspace" : "Hide models & workspace"} onClick={() => setHidePanel((v) => !v)}>⫼</button>
-        <button onClick={newConversation} title="New chat">new</button>
+        <button className="icon" title="Models & workspace" aria-label="Toggle models and workspace panel" onClick={toggleRight}>⫼</button>
+        <button onClick={newConversation} title="New chat"><span className="only-desktop">new</span><span className="only-mobile">+</span></button>
       </header>
       <div className="banner">{authMode === "none" ? "Local dev mode: authentication disabled (ASTRA_AUTH_MODE=none). Never deploy with this set." : ""}</div>
-      <Sidebar conversations={conversations} activeId={conversationId} onOpen={openConversation} onNew={newConversation} onDelete={deleteConversation} onRename={renameConversation} />
+      <div className="backdrop" onClick={() => setDrawer(null)} />
+      <Sidebar
+        conversations={conversations}
+        activeId={conversationId}
+        onOpen={(id) => { setDrawer(null); void openConversation(id); }}
+        onNew={() => { setDrawer(null); newConversation(); }}
+        onDelete={deleteConversation}
+        onRename={renameConversation}
+      />
       <Transcript entries={entries} draft={draft} modelLabels={modelLabels} />
       <Composer busy={busy || loadingConversation} onSend={handle} onStop={stop} />
-      <Panel models={models} modelId={modelId} onPickModel={setModelId} refreshKey={refreshKey} onOpenFile={openFile} />
+      <Panel models={models} modelId={modelId} onPickModel={(id) => { setModelId(id); setDrawer(null); }} refreshKey={refreshKey} onOpenFile={(p) => { setDrawer(null); void openFile(p); }} />
       <footer className="footer">
         <span><span className="k">model</span> {model?.label ?? "…"}</span>
         <span><span className="k">provider</span> {model?.provider ?? ""}</span>

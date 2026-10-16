@@ -43,3 +43,16 @@ export function usePref(key: string, initial: boolean): [boolean, (v: boolean | 
   }, [key]);
   return [v, set];
 }
+
+/** True when the viewport matches the CSS query (false during SSR). */
+export function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const on = () => setMatches(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, [query]);
+  return matches;
+}
