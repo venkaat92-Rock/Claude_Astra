@@ -17,6 +17,7 @@ export function ndjsonResponse(
         controller.enqueue(encoder.encode(JSON.stringify(value) + "\n"));
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+        console.error("[ndjson] stream failed", err);
         controller.enqueue(encoder.encode(JSON.stringify({ type: "error", message } satisfies AstraEvent) + "\n"));
         controller.close();
       }

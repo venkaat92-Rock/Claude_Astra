@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { MediaRef } from "@/lib/types";
+import { FileLink } from "./FileLink";
 
 export interface ToolView {
   id: string;
@@ -16,6 +17,8 @@ function summarize(name: string, input: unknown, inputJson?: string): string {
   const i = (input ?? safeParse(inputJson)) as Record<string, unknown> | undefined;
   if (!i) return inputJson ? inputJson.slice(0, 80) : "";
   switch (name) {
+    case "create_pptx": case "create_docx": case "create_xlsx":
+      return `${String(i.path ?? "")}${Array.isArray(i.slides) ? ` · ${i.slides.length} slides` : ""}`;
     case "read_file": case "write_file": case "edit_file": case "delete_file": case "list_files": case "cat":
       return String(i.path ?? "");
     case "search_files": return `"${i.query}"${i.path ? ` in ${i.path}` : ""}`;
@@ -33,7 +36,7 @@ function safeParse(json?: string): unknown {
 
 const ICONS: Record<string, string> = {
   read_file: "📄", write_file: "✎", edit_file: "✎", delete_file: "✕", list_files: "▤", search_files: "⌕",
-  web_fetch: "⇣", generate_image: "▣", generate_video: "▶", check_video: "⟳",
+  web_fetch: "⇣", create_pptx: "▦", create_docx: "▤", create_xlsx: "▦", generate_image: "▣", generate_video: "▶", check_video: "⟳",
 };
 
 export function ToolBlock({ tool }: { tool: ToolView }) {
@@ -64,8 +67,10 @@ export function ToolBlock({ tool }: { tool: ToolView }) {
             </>
           )}
           {tool.result?.media?.map((m, i) => (
-            <div className="tool-media" key={i}>
-              {m.kind === "image" ? (
+            <div className={m.kind === "file" ? "tool-file" : "tool-media"} key={i}>
+              {m.kind === "file" && m.path ? (
+                <FileLink path={m.path} name={m.name} />
+              ) : m.kind === "image" ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={m.url ?? `data:${m.mediaType};base64,${m.data}`} alt={m.path ?? "generated image"} />
               ) : (

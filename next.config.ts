@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
     "@aws-sdk/client-bedrock-agent-runtime",
     "@aws-sdk/client-s3",
     "@google/genai",
+    "pptxgenjs",
+    "docx",
   ],
   experimental: {
     // Allow large base64 image payloads from Nova Canvas to flow through route handlers.

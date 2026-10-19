@@ -5,6 +5,7 @@ import { generateImage } from "../providers/bedrock-image";
 import { getVideoStatus, startVideo } from "../providers/bedrock-video";
 import { modelCatalog } from "../config";
 import { extractText, isBinaryText } from "../extract";
+import { MIME, buildDocx, buildPptx, buildXlsx, type SlideSpec } from "../office";
 
 /** Provider-neutral tool definition. Each provider converts `inputSchema` to its own shape. */
 export interface ToolDef {
@@ -31,7 +32,10 @@ export interface ToolOutcome {
 /* ------------------------------ schemas ------------------------------ */
 
 const ListFiles = z.object({ path: z.string().optional().describe("Directory to list, relative to the workspace root. Omit for the whole workspace.") });
-const ReadFile = z.object({ path: z.string().describe("File path relative to the workspace root.") });
+const ReadFile = z.object({
+  path: z.string().describe("File path relative to the workspace root."),
+  offset: z.number().int().min(0).optional().describe("Character offset to start from. Long files are returned in pages of about 100k characters; pass the offset given at the end of the previous page."),
+});
 const WriteFile = z.object({
   path: z.string().describe("File path relative to the workspace root. Parent folders are implicit."),
   content: z.string().describe("Full file contents. Overwrites the file."),
@@ -61,40 +65,83 @@ const GenerateVideo = z.object({
   model: z.enum(["nova-reel", "luma-ray-2"]).optional().describe("Video model from the catalog. Default nova-reel."),
   duration_seconds: z.number().int().optional().describe("Nova Reel: 6. Luma Ray 2: 5 or 9."),
 });
+const Slide = z.object({
+  layout: z.enum(["title", "section", "bullets", "two_column", "table", "image"]).optional().describe("Default: title for the first slide, otherwise inferred from the fields given."),
+  title: z.string(),
+  subtitle: z.string().optional(),
+  bullets: z.array(z.string()).optional().describe("Bullet points. Indent with two leading spaces per level for sub-bullets."),
+  left: z.array(z.string()).optional().describe("two_column layout: left column bullets."),
+  right: z.array(z.string()).optional().describe("two_column layout: right column bullets."),
+  table: z.array(z.array(z.string())).optional().describe("table layout: rows of cells, first row is the header."),
+  image_path: z.string().optional().describe("Workspace path of a PNG/JPEG to place on the slide (e.g. one made with generate_image)."),
+  notes: z.string().optional().describe("Speaker notes."),
+});
+const CreatePptx = z.object({
+  path: z.string().describe("Workspace path ending in .pptx, e.g. outputs/plan.pptx"),
+  title: z.string().optional().describe("Presentation title (file metadata)."),
+  theme: z.enum(["light", "dark", "blue"]).optional(),
+  slides: z.array(Slide).min(1),
+});
+const CreateDocx = z.object({
+  path: z.string().describe("Workspace path ending in .docx"),
+  title: z.string().optional().describe("Document title shown at the top."),
+  markdown: z.string().describe("Body in Markdown: # headings, paragraphs, - bullets, 1. numbered lists, | tables |, ``` code ```, > quotes, **bold**, *italic*."),
+});
+const Sheet = z.object({
+  name: z.string(),
+  rows: z.array(z.array(z.string())).describe("Rows of cells. Numbers are stored as numbers; a cell starting with = is a formula, e.g. =SUM(B2:B9)."),
+});
+const CreateXlsx = z.object({
+  path: z.string().describe("Workspace path ending in .xlsx"),
+  sheets: z.array(Sheet).min(1),
+});
 const CheckVideo = z.object({ invocation_arn: z.string().describe("The invocationArn returned by generate_video.") });
 
 /* ------------------------------ definitions ------------------------------ */
 
-function schema(zt: z.ZodTypeAny): Record<string, unknown> {
-  // Minimal zod -> JSON Schema for flat object schemas (what the tools above use).
-  const def = (zt as z.ZodObject<z.ZodRawShape>).shape;
-  const properties: Record<string, unknown> = {};
-  const required: string[] = [];
-  for (const [key, raw] of Object.entries(def)) {
-    let t: z.ZodTypeAny = raw;
-    let optional = false;
-    while (t instanceof z.ZodOptional || t instanceof z.ZodDefault) {
-      optional = true;
-      t = t._def.innerType;
-    }
-    const description = raw.description ?? t.description;
-    let prop: Record<string, unknown>;
-    if (t instanceof z.ZodString) prop = { type: "string" };
-    else if (t instanceof z.ZodNumber) prop = { type: (t as z.ZodNumber)._def.checks.some((c: { kind: string }) => c.kind === "int") ? "integer" : "number" };
-    else if (t instanceof z.ZodBoolean) prop = { type: "boolean" };
-    else if (t instanceof z.ZodEnum) prop = { type: "string", enum: t._def.values };
-    else prop = {};
-    if (description) prop.description = description;
-    properties[key] = prop;
-    if (!optional) required.push(key);
+function unwrap(t: z.ZodTypeAny): { t: z.ZodTypeAny; optional: boolean } {
+  let optional = false;
+  while (t instanceof z.ZodOptional || t instanceof z.ZodDefault) {
+    optional = true;
+    t = t._def.innerType;
   }
-  return { type: "object", properties, required, additionalProperties: false };
+  return { t, optional };
+}
+
+/** Minimal zod -> JSON Schema for the shapes the tools use (objects, arrays, scalars, enums). */
+function jsonSchema(raw: z.ZodTypeAny): Record<string, unknown> {
+  const { t } = unwrap(raw);
+  const description = raw.description ?? t.description;
+  let prop: Record<string, unknown>;
+  if (t instanceof z.ZodString) prop = { type: "string" };
+  else if (t instanceof z.ZodNumber) prop = { type: (t as z.ZodNumber)._def.checks.some((c: { kind: string }) => c.kind === "int") ? "integer" : "number" };
+  else if (t instanceof z.ZodBoolean) prop = { type: "boolean" };
+  else if (t instanceof z.ZodEnum) prop = { type: "string", enum: t._def.values };
+  else if (t instanceof z.ZodArray) prop = { type: "array", items: jsonSchema(t._def.type) };
+  else if (t instanceof z.ZodObject) {
+    const properties: Record<string, unknown> = {};
+    const required: string[] = [];
+    for (const [key, child] of Object.entries((t as z.ZodObject<z.ZodRawShape>).shape)) {
+      properties[key] = jsonSchema(child);
+      if (!unwrap(child).optional) required.push(key);
+    }
+    prop = { type: "object", properties, required };
+  } else prop = {};
+  if (description) prop.description = description;
+  return prop;
+}
+
+function schema(zt: z.ZodTypeAny): Record<string, unknown> {
+  return { ...jsonSchema(zt), additionalProperties: false };
 }
 
 export const TOOL_DEFS: ToolDef[] = [
   { name: "list_files", description: "List files in the user's workspace (S3-backed). Returns paths and sizes.", inputSchema: schema(ListFiles) },
-  { name: "read_file", description: "Read a file from the workspace as text. Word (.docx), PowerPoint (.pptx), Excel (.xlsx) and PDF files are converted to text automatically.", inputSchema: schema(ReadFile) },
-  { name: "write_file", description: "Create or overwrite a file in the workspace with the given content.", inputSchema: schema(WriteFile), streamInput: true },
+  { name: "read_file", description: "Read a file from the workspace as text. Word (.docx), PowerPoint (.pptx), Excel (.xlsx) and PDF files are converted to text automatically. Long files come back in pages; use offset to continue.", inputSchema: schema(ReadFile) },
+  { name: "write_file", description: "Create or overwrite a text file in the workspace (code, Markdown, CSV, HTML...). The user gets a download link.", inputSchema: schema(WriteFile), streamInput: true },
+  { name: "create_pptx", description: "Create a PowerPoint (.pptx) deck in the workspace from a list of slides (title, bullets, two columns, tables, images, speaker notes). The user gets a download link. To change an existing deck, read it with read_file and create the revised deck.", inputSchema: schema(CreatePptx), streamInput: true },
+  { name: "create_docx", description: "Create a Word (.docx) document in the workspace from Markdown (headings, lists, tables, code, quotes). The user gets a download link. To revise an existing document, read it with read_file and create the new version.", inputSchema: schema(CreateDocx), streamInput: true },
+  { name: "create_xlsx", description: "Create an Excel (.xlsx) workbook in the workspace from sheets of rows. Numeric cells become numbers and cells starting with = become formulas. The user gets a download link.", inputSchema: schema(CreateXlsx), streamInput: true },
   { name: "edit_file", description: "Replace an exact string in a workspace file. Prefer this over write_file for small changes.", inputSchema: schema(EditFile), streamInput: true },
   { name: "delete_file", description: "Delete a file from the workspace.", inputSchema: schema(DeleteFile) },
   { name: "search_files", description: "Search file contents in the workspace. Returns matching lines with paths and line numbers.", inputSchema: schema(SearchFiles) },
@@ -110,6 +157,25 @@ export function toolByName(name: string): ToolDef | undefined {
 
 /* ------------------------------ executor ------------------------------ */
 
+/** Keep each tool result small: results are replayed in every later request of the conversation. */
+const READ_PAGE = 100_000;
+
+function page(text: string, offset = 0): string {
+  if (offset >= text.length && text.length > 0) return `[offset ${offset} is past the end; the file has ${text.length} characters]`;
+  const chunk = text.slice(offset, offset + READ_PAGE);
+  const end = offset + chunk.length;
+  return end < text.length ? `${chunk}\n\n[showing characters ${offset}-${end} of ${text.length}; call read_file with offset ${end} for more, or use search_files]` : chunk;
+}
+
+/** Download link for a workspace file; the UI fetches a fresh presigned URL on click. */
+function fileRef(path: string, mediaType?: string): MediaRef {
+  return { kind: "file", path, name: path.split("/").pop() ?? path, mediaType: mediaType ?? guessContentType(path) };
+}
+
+function withExt(path: string, ext: string): string {
+  return path.toLowerCase().endsWith(`.${ext}`) ? path : `${path}.${ext}`;
+}
+
 const TEXT_EXT = /\.(md|txt|json|ya?ml|toml|csv|html?|css|[cm]?[jt]sx?|py|rb|go|rs|java|kt|swift|sh|sql|env|ini|cfg|xml|svg|tf|dockerfile)$/i;
 
 export async function executeTool(name: string, rawInput: unknown, ctx: ToolContext): Promise<ToolOutcome> {
@@ -122,22 +188,52 @@ export async function executeTool(name: string, rawInput: unknown, ctx: ToolCont
         return { content: files.map((f) => `${f.path}\t${f.size} B`).join("\n") };
       }
       case "read_file": {
-        const { path } = ReadFile.parse(rawInput);
+        const { path, offset } = ReadFile.parse(rawInput);
         if (/\.(docx|pptx|xlsx|xlsm|pdf)$/i.test(path)) {
           const { bytes } = await ctx.workspace.readBytes(path);
           const text = await extractText(bytes, path);
           if (text === null) return { content: `Cannot extract text from ${path}`, isError: true };
-          return { content: text.length > 512 * 1024 ? text.slice(0, 512 * 1024) + "\n\n[truncated]" : text };
+          return { content: page(text, offset) };
         }
         const { bytes } = await ctx.workspace.readBytes(path);
         if (isBinaryText(bytes)) return { content: `${path} is a binary file (${bytes.byteLength} bytes); read_file only returns text. Office documents and PDFs are converted automatically; images can be attached in the chat.`, isError: true };
-        const text = new TextDecoder().decode(bytes);
-        return { content: text.length > 512 * 1024 ? text.slice(0, 512 * 1024) + `\n\n[truncated: file is ${bytes.byteLength} bytes]` : text };
+        return { content: page(new TextDecoder().decode(bytes), offset) };
       }
       case "write_file": {
         const { path, content } = WriteFile.parse(rawInput);
         await ctx.workspace.write(path, content);
-        return { content: `Wrote ${Buffer.byteLength(content)} bytes to ${path}` };
+        return { content: `Wrote ${Buffer.byteLength(content)} bytes to ${path}`, media: [fileRef(path)] };
+      }
+      case "create_pptx": {
+        const input = CreatePptx.parse(rawInput);
+        const path = withExt(input.path, "pptx");
+        const slides: SlideSpec[] = [];
+        for (const s of input.slides) {
+          const { image_path, ...rest } = s;
+          let image: SlideSpec["image"];
+          if (image_path) {
+            const { bytes, contentType } = await ctx.workspace.readBytes(image_path);
+            image = { data: Buffer.from(bytes).toString("base64"), mediaType: contentType?.startsWith("image/") ? contentType : guessContentType(image_path) };
+          }
+          slides.push({ ...rest, image });
+        }
+        const bytes = await buildPptx({ title: input.title, theme: input.theme, slides });
+        await ctx.workspace.write(path, bytes, MIME.pptx);
+        return { content: `Created ${path} (${slides.length} slides, ${bytes.byteLength} bytes). The user has a download link.`, media: [fileRef(path, MIME.pptx)] };
+      }
+      case "create_docx": {
+        const { path: p, title, markdown } = CreateDocx.parse(rawInput);
+        const path = withExt(p, "docx");
+        const bytes = await buildDocx(markdown, { title });
+        await ctx.workspace.write(path, bytes, MIME.docx);
+        return { content: `Created ${path} (${bytes.byteLength} bytes). The user has a download link.`, media: [fileRef(path, MIME.docx)] };
+      }
+      case "create_xlsx": {
+        const { path: p, sheets } = CreateXlsx.parse(rawInput);
+        const path = withExt(p, "xlsx");
+        const bytes = buildXlsx(sheets);
+        await ctx.workspace.write(path, bytes, MIME.xlsx);
+        return { content: `Created ${path} (${sheets.length} sheet${sheets.length === 1 ? "" : "s"}, ${bytes.byteLength} bytes). The user has a download link.`, media: [fileRef(path, MIME.xlsx)] };
       }
       case "edit_file": {
         const { path, old_string, new_string, replace_all } = EditFile.parse(rawInput);

@@ -37,6 +37,60 @@ function uid(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
+/**
+ * Keep request bodies well under the hosting limit (Amplify rejects bodies of a few MB
+ * with a bare HTTP 500/413). Attachment bytes stored in the workspace are dropped
+ * (the server reloads them), and if the history is still large, older tool output
+ * is shortened. The full text stays visible in the transcript.
+ */
+const REQUEST_BUDGET = 3_500_000;
+const KEEP_RECENT = 4;
+const OLD_RESULT_CHARS = 4_000;
+
+export function compactHistory(messages: AstraMessage[]): AstraMessage[] {
+  let out = messages.map((m) =>
+    m.parts.some((p) => (p.type === "image" || p.type === "document") && p.path && p.data)
+      ? { ...m, parts: m.parts.map((p) => ((p.type === "image" || p.type === "document") && p.path ? { ...p, data: "" } : p)) }
+      : m,
+  );
+  const size = () => new Blob([JSON.stringify(out)]).size;
+  if (size() <= REQUEST_BUDGET) return out;
+  const cut = Math.max(0, out.length - KEEP_RECENT);
+  const shorten = (t: string, label: string) => (t.length > OLD_RESULT_CHARS ? `${t.slice(0, OLD_RESULT_CHARS)}\n[... ${t.length - OLD_RESULT_CHARS} more characters of ${label} omitted to keep the request small; re-read the file if needed]` : t);
+  out = out.map((m, i) => i >= cut ? m : {
+    ...m,
+    parts: m.parts.map((p) => {
+      if (p.type === "tool_result") return { ...p, content: shorten(p.content, "tool output"), media: p.media?.map((x) => ({ ...x, data: undefined })) };
+      if (p.type === "text" && p.text.startsWith("<attached_file ")) return { ...p, text: shorten(p.text, "attachment text") };
+      return p;
+    }),
+  });
+  if (size() <= REQUEST_BUDGET) return out;
+  // Last resort: older inline images/PDFs (ones that could not be stored) become placeholders.
+  out = out.map((m, i) => i >= cut ? m : {
+    ...m,
+    parts: m.parts.map((p): AstraPart => (p.type === "image" || p.type === "document") && p.data ? { type: "text", text: `[earlier attachment ${p.name ?? ""} omitted to keep the request small]` } : p),
+  });
+  return out;
+}
+
+/** Turn a failed fetch into a message that says what happened and what to do. */
+async function describeFailure(res: Response): Promise<string> {
+  const raw = await res.text().catch(() => "");
+  let msg = "";
+  try { msg = (JSON.parse(raw) as { error?: string }).error ?? ""; } catch { /* not JSON */ }
+  if (msg) return msg;
+  const hint =
+    res.status === 413 ? "The request was too large for the server." :
+    res.status === 401 || res.status === 403 ? "Your sign-in may have expired; reload the page and sign in again." :
+    res.status === 502 || res.status === 503 || res.status === 504 ? "The server took too long or was restarting. Your chat is saved; send \"continue\" to pick up where it stopped." :
+    res.status >= 500 ? "The hosting platform returned an error before the app could answer. Your chat is saved; try again, or start a new chat if it repeats." : "";
+  const detail = raw && !raw.trimStart().startsWith("<") ? ` ${raw.slice(0, 200)}` : "";
+  return `HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ""}. ${hint}${detail}`.trim();
+}
+
+const MAX_CONTINUATIONS = 12;
+
 function messagesOf(entries: Entry[]): AstraMessage[] {
   return entries.filter((e): e is Extract<Entry, { kind: "message" }> => e.kind === "message").map((e) => e.message);
 }
@@ -64,7 +118,8 @@ export function useAstra() {
   const model = models.find((m) => m.id === modelId);
 
   const pushLine = useCallback((kind: Line["kind"], text: string) => {
-    setEntries((es) => [...es, { kind: "line", line: { id: uid(), kind, text } }]);
+    entriesRef.current = [...entriesRef.current, { kind: "line", line: { id: uid(), kind, text } }];
+    setEntries(entriesRef.current);
   }, []);
 
   /* ---------------- cloud conversations ---------------- */
@@ -90,7 +145,8 @@ export function useAstra() {
       const rec = (await r.json()) as ConversationRecord & { error?: string };
       if (!r.ok) throw new Error(rec.error ?? `HTTP ${r.status}`);
       setConversationId(rec.id);
-      setEntries(rec.messages.map((m) => ({ kind: "message", message: m })));
+      entriesRef.current = rec.messages.map((m) => ({ kind: "message", message: m }));
+      setEntries(entriesRef.current);
       if (rec.modelId) setModelId(rec.modelId);
       setEffort(rec.effort);
       setUsage({});
@@ -111,10 +167,10 @@ export function useAstra() {
       const r = await fetch("/api/conversations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: cid, modelId: mid, effort: eff, messages: msgs }),
+        body: JSON.stringify({ id: cid, modelId: mid, effort: eff, messages: compactHistory(msgs) }),
       });
-      const summary = (await r.json()) as ConversationSummary & { error?: string };
-      if (!r.ok) throw new Error(summary.error ?? `HTTP ${r.status}`);
+      if (!r.ok) throw new Error(await describeFailure(r));
+      const summary = (await r.json()) as ConversationSummary;
       setConversations((cs) => [summary, ...cs.filter((c) => c.id !== summary.id)]);
       try { localStorage.setItem(LAST_KEY, summary.id); } catch { /* ignore */ }
     } catch (err) {
@@ -124,6 +180,7 @@ export function useAstra() {
 
   const newConversation = useCallback(() => {
     abortRef.current?.abort();
+    entriesRef.current = [];
     setEntries([]);
     setDraft(null);
     setUsage({});
@@ -196,7 +253,8 @@ export function useAstra() {
         setDraft((d) => d && { ...d, tools: d.tools.map((t) => (t.id === ev.id ? { ...t, result: { content: ev.content, isError: ev.isError, media: ev.media } } : t)) });
         break;
       case "turn_end":
-        setEntries((es) => [...es, { kind: "message", message: ev.message }]);
+        entriesRef.current = [...entriesRef.current, { kind: "message", message: ev.message }];
+        setEntries(entriesRef.current);
         if (ev.message.role === "assistant") setDraft(null);
         if (ev.usage) {
           setUsage((u) => ({
@@ -218,42 +276,74 @@ export function useAstra() {
     }
   }, [pushLine]);
 
+  /** Stream one /api/chat request; returns the final stop reason (undefined if the stream ended early). */
+  const streamOnce = useCallback(async (history: AstraMessage[], signal: AbortSignal): Promise<{ stopReason?: string; failed?: boolean }> => {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: compactHistory(history), modelId: stateRef.current.modelId, effort: stateRef.current.effort, conversationId: stateRef.current.conversationId }),
+      signal,
+    });
+    if (!res.ok || !res.body) {
+      pushLine("error", await describeFailure(res));
+      return { failed: true };
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    let stopReason: string | undefined;
+    let sawError = false;
+    const handleLine = (line: string) => {
+      if (!line) return;
+      try {
+        const ev = JSON.parse(line) as AstraEvent;
+        if (ev.type === "done") stopReason = ev.stopReason;
+        if (ev.type === "error") sawError = true;
+        if (ev.type === "done" && ev.stopReason === "continue") return; // keep the draft area quiet between rounds
+        applyEvent(ev);
+      } catch { /* skip malformed line */ }
+    };
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buf.indexOf("\n")) >= 0) {
+          handleLine(buf.slice(0, nl).trim());
+          buf = buf.slice(nl + 1);
+        }
+      }
+      handleLine(buf.trim());
+    } catch (err) {
+      if ((err as Error).name === "AbortError") throw err;
+      pushLine("error", `The connection dropped while Claude Astra was working (${err instanceof Error ? err.message : String(err)}). Everything up to this point is saved; send "continue" to resume.`);
+      return { failed: true };
+    }
+    if (!stopReason && !sawError && !signal.aborted) {
+      pushLine("error", "The server closed the connection before the reply finished (the hosting time limit may have been reached). Everything up to this point is saved; send \"continue\" to resume.");
+      return { failed: true };
+    }
+    return { stopReason };
+  }, [applyEvent, pushLine]);
+
   /** Send a user message (text plus any attachment parts) through the agent loop, then save. */
   const send = useCallback(
     async (parts: AstraPart[]) => {
       if (busy || !modelId) return;
       const userMessage: AstraMessage = { id: uid(), role: "user", parts, createdAt: new Date().toISOString() };
-      const history = [...messagesOf(entriesRef.current), userMessage];
-      setEntries((es) => [...es, { kind: "message", message: userMessage }]);
+      entriesRef.current = [...entriesRef.current, { kind: "message", message: userMessage }];
+      setEntries(entriesRef.current);
       setBusy(true);
       const controller = new AbortController();
       abortRef.current = controller;
       try {
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: history, modelId, effort, conversationId }),
-          signal: controller.signal,
-        });
-        if (!res.ok || !res.body) {
-          const j = (await res.json().catch(() => ({}))) as { error?: string };
-          pushLine("error", j.error ?? `HTTP ${res.status}`);
-          return;
-        }
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buf = "";
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          buf += decoder.decode(value, { stream: true });
-          let nl: number;
-          while ((nl = buf.indexOf("\n")) >= 0) {
-            const line = buf.slice(0, nl).trim();
-            buf = buf.slice(nl + 1);
-            if (!line) continue;
-            try { applyEvent(JSON.parse(line) as AstraEvent); } catch { /* skip malformed line */ }
-          }
+        // Long agent runs are split into several short requests: the server pauses between
+        // tool rounds ("continue") and we resume with the updated history.
+        for (let round = 0; round <= MAX_CONTINUATIONS; round++) {
+          const { stopReason } = await streamOnce(messagesOf(entriesRef.current), controller.signal);
+          if (stopReason !== "continue") break;
+          if (round === MAX_CONTINUATIONS) pushLine("system", "Paused after a long run. Send \"continue\" to keep going.");
         }
       } catch (err) {
         if ((err as Error).name === "AbortError") pushLine("system", "Stopped.");
@@ -265,7 +355,7 @@ export function useAstra() {
         void persist();
       }
     },
-    [busy, modelId, effort, conversationId, applyEvent, pushLine, persist],
+    [busy, modelId, streamOnce, pushLine, persist],
   );
 
   return {

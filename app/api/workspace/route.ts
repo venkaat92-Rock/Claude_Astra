@@ -17,14 +17,14 @@ function handle(err: unknown): Response {
 
 /** GET /api/workspace            -> list files
  *  GET /api/workspace?path=a/b   -> read a text file
- *  GET /api/workspace?path=a/b&url=1 -> presigned download URL */
+ *  GET /api/workspace?path=a/b&url=1 -> presigned URL (add &download=1 to save as a file) */
 export async function GET(request: Request): Promise<Response> {
   try {
     const w = await ws();
     const u = new URL(request.url);
     const path = u.searchParams.get("path");
     if (!path) return Response.json({ files: await w.list() });
-    if (u.searchParams.get("url")) return Response.json({ url: await w.presign(path) });
+    if (u.searchParams.get("url")) return Response.json({ url: await w.presign(path, 3600, !!u.searchParams.get("download")) });
     return Response.json({ path, content: await w.read(path) });
   } catch (err) {
     return handle(err);
