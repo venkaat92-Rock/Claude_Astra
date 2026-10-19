@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ModelInfo } from "@/lib/client/useAstra";
 import { byPriority } from "@/lib/models";
 import { usePref } from "@/lib/client/useTheme";
+import { downloadWorkspaceFile } from "@/lib/client/download";
 
 interface FileRow { path: string; size: number; modified?: string }
 
@@ -79,9 +80,10 @@ export function Panel({ models, modelId, onPickModel, refreshKey, onOpenFile }: 
         {err && <div className="empty">{err}</div>}
         {!err && files && files.length === 0 && <div className="empty">empty — ask the agent to create a file, or attach one</div>}
         {!err && files?.map((f) => (
-          <div key={f.path} className="file" onClick={() => onOpenFile(f.path)}>
+          <div key={f.path} className="file" title="Click to view as text; ⬇ to download" onClick={() => onOpenFile(f.path)}>
             <span>{f.path}</span>
             <span className="size">{fmtSize(f.size)}</span>
+            <button className="dl" title={`Download ${f.path}`} onClick={(e) => { e.stopPropagation(); void downloadWorkspaceFile(f.path).catch((er: Error) => setErr(er.message)); }}>⬇</button>
           </div>
         ))}
       </Section>

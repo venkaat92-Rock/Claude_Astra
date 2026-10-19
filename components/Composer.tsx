@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SLASH_COMMANDS } from "@/lib/client/slash-commands";
 import { prepareAttachment, type Attachment } from "@/lib/client/attachments";
+import { useSpeech } from "@/lib/client/useSpeech";
 import type { AstraPart } from "@/lib/types";
 
 export function Composer({ busy, onSend, onStop }: {
@@ -16,6 +17,14 @@ export function Composer({ busy, onSend, onStop }: {
   const [drag, setDrag] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Dictation: spoken words are appended after whatever was typed before the mic was switched on.
+  const dictationBase = useRef("");
+  const speech = useSpeech((spoken) => setValue(dictationBase.current + spoken));
+  const toggleMic = () => {
+    if (!speech.listening) dictationBase.current = value && !/\s$/.test(value) ? value + " " : value;
+    speech.toggle();
+    ref.current?.focus();
+  };
 
   const showSuggest = value.startsWith("/") && !value.includes(" ") && !value.includes("\n");
   const matches = showSuggest ? SLASH_COMMANDS.filter((c) => ("/" + c.name).startsWith(value.toLowerCase())) : [];
@@ -48,6 +57,7 @@ export function Composer({ busy, onSend, onStop }: {
     const text = value.trim();
     const pending = attachments.some((a) => a.status === "processing");
     if ((!text && attachments.length === 0) || pending) return;
+    speech.stop();
     void onSend(text, attachments);
     setValue("");
     setAttachments([]);
@@ -126,10 +136,21 @@ export function Composer({ busy, onSend, onStop }: {
         <div className="actions">
           <input ref={fileRef} type="file" multiple hidden onChange={(e) => { if (e.target.files) void addFiles(e.target.files); e.target.value = ""; }} />
           <button className="icon" title="Attach files (images, PDFs, text, anything else goes to the workspace)" onClick={() => fileRef.current?.click()}>📎</button>
+          {speech.supported && (
+            <button className={`icon mic ${speech.listening ? "on" : ""}`} title={speech.listening ? "Stop dictation" : "Speak instead of typing"} aria-pressed={speech.listening} onClick={toggleMic}>
+              {speech.listening ? "■" : "🎤"}
+            </button>
+          )}
           {busy ? <button onClick={onStop}>stop</button> : <button onClick={submit} disabled={(!value.trim() && attachments.length === 0) || attachments.some((a) => a.status === "processing")}>send</button>}
         </div>
       </div>
-      <div className="hint">Enter to send · Shift+Enter newline · Esc stops · / commands · 📎 or drag/paste to attach</div>
+      {speech.error ? (
+        <div className="hint err">{speech.error}</div>
+      ) : speech.listening ? (
+        <div className="hint live">● Listening… speak now, tap ■ to stop, then Enter to send</div>
+      ) : (
+        <div className="hint">Enter to send · Shift+Enter newline · Esc stops · / commands · 📎 attach{speech.supported ? " · 🎤 speak" : ""}</div>
+      )}
     </div>
   );
 }

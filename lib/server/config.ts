@@ -17,6 +17,8 @@ export interface ServerConfig {
   claudeApi: "converse" | "messages";
   authMode: "cognito" | "none";
   defaultModelId: string;
+  /** Seconds after which a chat request pauses between tool rounds so the client can resume (0 = never). */
+  requestBudgetSeconds: number;
 }
 
 let cached: ServerConfig | undefined;
@@ -53,6 +55,7 @@ export function serverConfig(): ServerConfig {
     claudeApi: process.env.ASTRA_CLAUDE_API === "messages" ? "messages" : "converse",
     authMode,
     defaultModelId: process.env.ASTRA_DEFAULT_MODEL || DEFAULT_MODEL_ID,
+    requestBudgetSeconds: budgetSeconds(process.env.ASTRA_REQUEST_BUDGET_SECONDS),
   };
   return cached;
 }
@@ -109,4 +112,10 @@ export function modelAvailability(m: ModelSpec): { available: boolean; reason?: 
   }
   if (m.provider === "bedrock-video" && !cfg.mediaBucket) return { available: false, reason: "ASTRA_MEDIA_BUCKET not set" };
   return { available: true };
+}
+
+function budgetSeconds(v: string | undefined): number {
+  const n = Number(v);
+  // Default 20s: Amplify Hosting cuts requests at roughly 30s, so pause well before that.
+  return v !== undefined && v !== "" && Number.isFinite(n) && n >= 0 ? n : 20;
 }

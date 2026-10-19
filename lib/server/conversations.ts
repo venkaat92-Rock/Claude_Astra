@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { AstraMessage, ConversationRecord, ConversationSummary, Effort } from "@/lib/types";
+import { stripStoredAttachmentData } from "./history";
 import { INTERNAL_DIR, Workspace } from "./workspace";
 
 /**
@@ -40,15 +41,16 @@ export class ConversationStore {
   async save(input: { id?: string; title?: string; modelId: string; messages: AstraMessage[]; effort?: Effort }): Promise<ConversationSummary> {
     const id = input.id ?? randomUUID();
     const existing = input.id ? await this.get(id) : null;
-    const title = (input.title ?? existing?.title ?? deriveTitle(input.messages)).slice(0, 120);
+    const messages = stripStoredAttachmentData(input.messages);
+    const title = (input.title ?? existing?.title ?? deriveTitle(messages)).slice(0, 120);
     const record: ConversationRecord = {
       id,
       title,
       modelId: input.modelId,
       effort: input.effort,
-      messages: input.messages,
+      messages,
       updatedAt: new Date().toISOString(),
-      messageCount: input.messages.length,
+      messageCount: messages.length,
     };
     await this.ws.write(bodyPath(id), JSON.stringify(record), "application/json");
     const summary: ConversationSummary = { id, title, modelId: record.modelId, updatedAt: record.updatedAt, messageCount: record.messageCount };

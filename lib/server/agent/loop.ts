@@ -35,6 +35,12 @@ export interface AgentRunOptions {
   ctx: ToolContext;
   sessionId: string;
   tools?: ToolDef[];
+  /**
+   * Epoch ms after which the loop pauses between tool rounds and returns
+   * stopReason "continue"; the client then resumes with a fresh request. This keeps
+   * each HTTP request well inside the hosting platform's time limit.
+   */
+  deadline?: number;
 }
 
 /**
@@ -105,6 +111,11 @@ export async function* runAgent(opts: AgentRunOptions): AsyncGenerator<AstraEven
     const toolMessage: AstraMessage = { id: randomUUID(), role: "user", parts: resultParts, createdAt: new Date().toISOString() };
     history.push(toolMessage);
     yield { type: "turn_end", message: toolMessage, stopReason: "tool_use" };
+
+    if (opts.deadline && Date.now() > opts.deadline && iteration < MAX_ITERATIONS) {
+      yield { type: "done", stopReason: "continue", iterations: iteration };
+      return;
+    }
   }
 
   yield { type: "status", text: `Stopped after ${MAX_ITERATIONS} tool iterations. Send another message to continue.` };

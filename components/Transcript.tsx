@@ -5,6 +5,20 @@ import type { AstraMessage, AstraPart } from "@/lib/types";
 import type { Draft, Entry } from "@/lib/client/useAstra";
 import { Markdown } from "./Markdown";
 import { ToolBlock, type ToolView } from "./ToolBlock";
+import { FileLink } from "./FileLink";
+import { useWorkspaceUrl } from "@/lib/client/download";
+
+/** Attached image: inline bytes when present, otherwise loaded from the workspace. */
+function AttachedImage({ part }: { part: Extract<AstraPart, { type: "image" }> }) {
+  const url = useWorkspaceUrl(part.data ? undefined : part.path);
+  const src = part.data ? `data:${part.mediaType};base64,${part.data}` : url;
+  if (!src) return <span className="chip"><span className="k">IMG</span><span className="n">{part.name ?? part.path}</span></span>;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img className="full" src={src} alt={part.name ?? "attached image"} />;
+}
+
+/** Notes the client adds for the model; not shown in the transcript. */
+const HIDDEN_NOTE = /^\(Attachments are also saved in the workspace:/;
 
 const WELCOME = `Type a request, or / for commands. The agent works inside your workspace
 (right panel) and can fetch docs and generate images and video on Bedrock.`;
@@ -84,7 +98,7 @@ export function Transcript({ entries, draft, modelLabels }: { entries: Entry[]; 
         if (m.role === "user") {
           if (m.parts.every((p) => p.type === "tool_result")) return null; // tool results render under their tool call
           const text = m.parts
-            .filter((p): p is Extract<AstraPart, { type: "text" }> => p.type === "text" && !p.text.startsWith("<attached_file "))
+            .filter((p): p is Extract<AstraPart, { type: "text" }> => p.type === "text" && !p.text.startsWith("<attached_file ") && !HIDDEN_NOTE.test(p.text))
             .map((p) => p.text)
             .join("\n");
           const attachments = m.parts.filter((p) => p.type === "image" || p.type === "document" || (p.type === "text" && p.text.startsWith("<attached_file ")));
@@ -95,13 +109,12 @@ export function Transcript({ entries, draft, modelLabels }: { entries: Entry[]; 
                 {attachments.length > 0 && (
                   <div className="attachments">
                     {attachments.map((p, i) => {
-                      if (p.type === "image") {
-                        // eslint-disable-next-line @next/next/no-img-element
-                        return <img key={i} className="full" src={`data:${p.mediaType};base64,${p.data}`} alt={p.name ?? "attached image"} />;
-                      }
-                      if (p.type === "document") return <span key={i} className="chip"><span className="k">PDF</span><span className="n">{p.name}</span></span>;
-                      const name = /name="([^"]*)"/.exec((p as { text: string }).text)?.[1] ?? "file";
-                      return <span key={i} className="chip"><span className="k">txt</span><span className="n">{name}</span></span>;
+                      if (p.type === "image") return <AttachedImage key={i} part={p} />;
+                      if (p.type === "document") return p.path ? <FileLink key={i} path={p.path} name={p.name} /> : <span key={i} className="chip"><span className="k">PDF</span><span className="n">{p.name}</span></span>;
+                      const t = (p as { text: string }).text;
+                      const name = /name="([^"]*)"/.exec(t)?.[1] ?? "file";
+                      const source = /source="([^"]*)"/.exec(t)?.[1];
+                      return source ? <FileLink key={i} path={source} name={name} /> : <span key={i} className="chip"><span className="k">txt</span><span className="n">{name}</span></span>;
                     })}
                   </div>
                 )}

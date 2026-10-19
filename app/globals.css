@@ -143,6 +143,20 @@ select, input, textarea { font: inherit; color: inherit; background: var(--bg-el
 .composer textarea:focus { border-color: var(--accent); }
 .composer .actions { display: flex; gap: 6px; }
 .composer .hint { color: var(--fg-faint); font-size: 11px; margin-top: 6px; }
+.composer .hint.err { color: var(--err); }
+.composer .hint.live { color: var(--accent); }
+button.icon.mic.on { color: #fff; background: var(--err); border-color: var(--err); animation: astra-pulse 1.4s ease-in-out infinite; }
+@keyframes astra-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(185, 28, 28, .45); } 50% { box-shadow: 0 0 0 6px rgba(185, 28, 28, 0); } }
+
+/* downloadable files (PowerPoint, Word, Excel...) */
+.tool-file { margin: 6px 0 2px; }
+.file-link { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; border: 1px solid var(--border); background: var(--bg-panel); border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer; color: var(--fg); text-align: left; }
+.file-link:hover { border-color: var(--accent); }
+.file-link .k { font-size: 10px; font-weight: 700; letter-spacing: .04em; color: #fff; background: var(--accent); border-radius: 4px; padding: 1px 5px; flex: none; }
+.file-link .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.file-link .dl { color: var(--accent); flex: none; font-size: 12px; }
+.file-link.err .dl { color: var(--err); }
+.msg-user .attachments .file-link { padding: 3px 8px; font-size: 12px; }
 .suggest { position: absolute; bottom: 100%; left: 36px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); min-width: 320px; max-height: 240px; overflow: auto; z-index: 5; }
 .suggest div { padding: 5px 10px; cursor: pointer; display: flex; gap: 10px; }
 .suggest div.active, .suggest div:hover { background: var(--accent-soft); }
@@ -156,7 +170,10 @@ select, input, textarea { font: inherit; color: inherit; background: var(--bg-el
 .no-panel .panel { display: none; }
 .panel .file { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; cursor: pointer; color: var(--fg); }
 .panel .file:hover { color: var(--accent); }
-.panel .file .size { color: var(--fg-faint); }
+.panel .file > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.panel .file .size { color: var(--fg-faint); flex: none; }
+.panel .file .dl { border: none; background: none; padding: 0 2px; color: var(--fg-faint); cursor: pointer; flex: none; }
+.panel .file .dl:hover { color: var(--accent); }
 .panel .models .m { padding: 3px 0; display: flex; gap: 8px; align-items: baseline; cursor: pointer; }
 .panel .models .m.active { color: var(--accent); }
 .panel .models .m.off { color: var(--fg-faint); cursor: not-allowed; }
@@ -185,6 +202,8 @@ select, input, textarea { font: inherit; color: inherit; background: var(--bg-el
   .transcript { grid-column: 1; padding: 12px 12px 6px; }
   .composer { grid-column: 1; padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); }
   .composer .hint { display: none; }
+  .composer .hint.err, .composer .hint.live { display: block; }
+  .composer .actions button.icon { padding: 4px 9px; font-size: 16px; }
   .suggest { left: 8px; right: 8px; min-width: 0; }
   .footer { gap: 10px; padding: 3px 8px; font-size: 11px; }
   .footer .k { display: none; }

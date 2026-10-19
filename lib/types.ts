@@ -14,7 +14,10 @@ export type ProviderKind =
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 
 export type MediaRef = {
-  kind: "image" | "video";
+  /** "file" is a downloadable workspace file (PowerPoint, Word, Excel, text...). */
+  kind: "image" | "video" | "file";
+  /** Display name for downloadable files. */
+  name?: string;
   /** Presigned URL (preferred for large media). */
   url?: string;
   /** Inline base64 (small images only). */
@@ -27,9 +30,14 @@ export type MediaRef = {
 export type AstraPart =
   | { type: "text"; text: string }
   | { type: "thinking"; text: string }
-  | { type: "image"; mediaType: string; data: string; name?: string }
-  /** PDF (or other document) attached by the user, base64-encoded. */
-  | { type: "document"; mediaType: string; data: string; name: string }
+  /**
+   * Image attached by the user. When `path` is set the bytes live in the workspace and
+   * `data` may be empty: the server loads them before calling the model, which keeps
+   * chat requests small (Amplify rejects very large request bodies).
+   */
+  | { type: "image"; mediaType: string; data: string; name?: string; path?: string }
+  /** PDF (or other document) attached by the user; base64 `data`, or empty with a workspace `path`. */
+  | { type: "document"; mediaType: string; data: string; name: string; path?: string }
   | { type: "tool_use"; id: string; name: string; input: unknown }
   | {
       type: "tool_result";
@@ -56,7 +64,8 @@ export interface AstraMessage {
   createdAt?: string;
 }
 
-export type StopReason = "end_turn" | "tool_use" | "max_tokens" | "refusal" | "error" | "aborted";
+/** "continue": the server paused between tool rounds to keep each HTTP request short; the client resumes automatically. */
+export type StopReason = "end_turn" | "tool_use" | "max_tokens" | "refusal" | "error" | "aborted" | "continue";
 
 export interface Usage {
   inputTokens?: number;
