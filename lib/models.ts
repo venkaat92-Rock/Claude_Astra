@@ -62,8 +62,10 @@ export const DEFAULT_MODELS: ModelSpec[] = [
     contextWindow: 1_000_000,
     maxOutputTokens: 128_000,
     defaults: { effort: "high", maxTokens: 64_000, thinking: "adaptive", eagerToolStreaming: true },
-    notes: "Bedrock access criteria apply; check Model access in the console.",
+    notes: "Verified in the deployed app via Converse (us.anthropic.claude-opus-5-5).",
     enabled: true,
+    status: "working",
+    priority: 1,
   },
   {
     id: "claude-fable-5-1",
@@ -131,7 +133,7 @@ export const DEFAULT_MODELS: ModelSpec[] = [
     notes: "DiagramIQ priority 1.",
     enabled: true,
     status: "working",
-    priority: 2,
+    priority: 3,
   },
   {
     id: "claude-haiku-4-5",
@@ -146,7 +148,7 @@ export const DEFAULT_MODELS: ModelSpec[] = [
     notes: "DiagramIQ priority 2.",
     enabled: true,
     status: "working",
-    priority: 3,
+    priority: 4,
   },
   {
     id: "claude-sonnet-4-5",
@@ -160,7 +162,7 @@ export const DEFAULT_MODELS: ModelSpec[] = [
     defaults: { maxTokens: 8_000, thinking: "none" },
     enabled: true,
     status: "working",
-    priority: 5,
+    priority: 6,
   },
   {
     id: "pixtral-large",
@@ -174,7 +176,7 @@ export const DEFAULT_MODELS: ModelSpec[] = [
     defaults: { maxTokens: 8_000 },
     enabled: true,
     status: "working",
-    priority: 6,
+    priority: 7,
   },
   {
     id: "llama4-maverick",
@@ -188,7 +190,7 @@ export const DEFAULT_MODELS: ModelSpec[] = [
     defaults: { maxTokens: 8_000 },
     enabled: true,
     status: "working",
-    priority: 7,
+    priority: 8,
   },
   {
     id: "llama4-scout",
@@ -202,7 +204,7 @@ export const DEFAULT_MODELS: ModelSpec[] = [
     defaults: { maxTokens: 8_000 },
     enabled: true,
     status: "working",
-    priority: 8,
+    priority: 9,
   },
 
   // ---------------- Amazon Nova (Converse API) ----------------
@@ -220,7 +222,7 @@ export const DEFAULT_MODELS: ModelSpec[] = [
     notes: "Inference-profile id (us.). Use global.amazon.nova-2-lite-v1:0 for global routing.",
     enabled: true,
     status: "working",
-    priority: 4,
+    priority: 5,
   },
   {
     id: "nova-pro",
@@ -234,7 +236,7 @@ export const DEFAULT_MODELS: ModelSpec[] = [
     defaults: { maxTokens: 5_000 },
     enabled: true,
     status: "working",
-    priority: 9,
+    priority: 10,
   },
   {
     id: "nova-premier",
@@ -299,7 +301,7 @@ export const DEFAULT_MODELS: ModelSpec[] = [
     notes: "Converse requires an inference-profile prefix; the server prepends ASTRA_CLAUDE_ROUTING (default us.).",
     enabled: true,
     status: "working",
-    priority: 1,
+    priority: 2,
   },
   {
     id: "gpt-6-1-sol",
@@ -405,7 +407,7 @@ export const DEFAULT_MODELS: ModelSpec[] = [
   },
 ];
 
-export const DEFAULT_MODEL_ID = "claude-opus-4-5";
+export const DEFAULT_MODEL_ID = "claude-opus-5-5";
 
 export function findModel(models: ModelSpec[], id: string): ModelSpec | undefined {
   return models.find((m) => m.id === id);

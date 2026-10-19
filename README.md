@@ -57,8 +57,8 @@ The model picker shows two groups. **Tested & working** lists models confirmed e
 
 | Status | Models |
 |---|---|
-| Tested & working (priority order) | OpenAI GPT-6 Astra, Claude Opus 4.5, Claude Haiku 4.5, Amazon Nova 2 Lite, Claude Sonnet 4.5, Mistral Pixtral Large, Meta Llama 4 Maverick, Meta Llama 4 Scout, Amazon Nova Pro. GPT-6 Astra and the Nova models were confirmed in this app; the rest were verified through the same Converse API in the same AWS account by the DiagramIQ project |
-| Yet to work | Claude Opus 5.5 / Fable 5.1 / Sonnet 5.5 / Haiku 5.5 / Opus 4.8 (now routed via Converse), GPT-6.1 Sol, GPT-6 Sol, GPT-6 Luna, Gemini (needs `GOOGLE_API_KEY`), Bedrock Agent (needs ids), Nova Canvas, Nova Reel, Luma Ray 2 (need `ASTRA_BEDROCK_REGION` / `ASTRA_MEDIA_BUCKET`) |
+| Tested & working (priority order) | Claude Opus 5.5, OpenAI GPT-6 Astra, Claude Opus 4.5, Claude Haiku 4.5, Amazon Nova 2 Lite, Claude Sonnet 4.5, Mistral Pixtral Large, Meta Llama 4 Maverick, Meta Llama 4 Scout, Amazon Nova Pro. Claude Opus 5.5, GPT-6 Astra and the Nova models were confirmed in this app; the rest were verified through the same Converse API in the same AWS account by the DiagramIQ project |
+| Yet to work | Claude Fable 5.1 / Sonnet 5.5 / Haiku 5.5 / Opus 4.8 (routed via Converse like Opus 5.5), GPT-6.1 Sol, GPT-6 Sol, GPT-6 Luna, Gemini (needs `GOOGLE_API_KEY`), Bedrock Agent (needs ids), Nova Canvas, Nova Reel, Luma Ray 2 (need `ASTRA_BEDROCK_REGION` / `ASTRA_MEDIA_BUCKET`) |
 | Retired | Amazon Nova Premier |
 
 ## Slash commands
@@ -77,7 +77,7 @@ The model picker shows two groups. **Tested & working** lists models confirmed e
 - **Gemini is not on Bedrock.** The `gemini` provider calls Google directly; the only Google models Bedrock offers are open-weight Gemma, which you can enable as a `bedrock-converse` entry.
 - **Video is asynchronous.** `generate_video` returns an invocation ARN; `check_video` (or `/video status`) polls and presigns `output.mp4` from the media bucket.
 - **Chats are saved in the cloud.** Each conversation is stored in the user's S3 workspace under `.astra/conversations/`, so the chat list on the left follows the user to any device. Double-click a chat to rename it.
-- **Attachments.** Paperclip, drag-and-drop or paste. Images (resized in the browser) and PDFs go to the model as vision/document input, small text files are inlined, and everything else is uploaded to `uploads/` in the workspace for the agent's file tools.
+- **Attachments.** Paperclip, drag-and-drop or paste. Images (resized in the browser) and PDFs go to the model as vision/document input, small text files are inlined, and everything else is uploaded to `uploads/` in the workspace. Word, PowerPoint, Excel and PDF uploads are converted to text on the server (saved as `<name>.txt`, inlined when small), and the agent's `read_file` converts them too.
 - **Accounts are admin-created.** Self sign-up is disabled in the user pool and hidden from the sign-in screen; create users in the Cognito console.
 - **Light theme by default**, dark via the ☾ button or `/theme`.
 - No shell execution: the agent writes files and tells you what to run. Add AgentCore Code Interpreter or a Lambda-backed `run_command` tool if you need execution.

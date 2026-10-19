@@ -4,6 +4,7 @@ import { Workspace, guessContentType } from "../workspace";
 import { generateImage } from "../providers/bedrock-image";
 import { getVideoStatus, startVideo } from "../providers/bedrock-video";
 import { modelCatalog } from "../config";
+import { extractText, isBinaryText } from "../extract";
 
 /** Provider-neutral tool definition. Each provider converts `inputSchema` to its own shape. */
 export interface ToolDef {
@@ -92,7 +93,7 @@ function schema(zt: z.ZodTypeAny): Record<string, unknown> {
 
 export const TOOL_DEFS: ToolDef[] = [
   { name: "list_files", description: "List files in the user's workspace (S3-backed). Returns paths and sizes.", inputSchema: schema(ListFiles) },
-  { name: "read_file", description: "Read a text file from the workspace.", inputSchema: schema(ReadFile) },
+  { name: "read_file", description: "Read a file from the workspace as text. Word (.docx), PowerPoint (.pptx), Excel (.xlsx) and PDF files are converted to text automatically.", inputSchema: schema(ReadFile) },
   { name: "write_file", description: "Create or overwrite a file in the workspace with the given content.", inputSchema: schema(WriteFile), streamInput: true },
   { name: "edit_file", description: "Replace an exact string in a workspace file. Prefer this over write_file for small changes.", inputSchema: schema(EditFile), streamInput: true },
   { name: "delete_file", description: "Delete a file from the workspace.", inputSchema: schema(DeleteFile) },
@@ -122,7 +123,16 @@ export async function executeTool(name: string, rawInput: unknown, ctx: ToolCont
       }
       case "read_file": {
         const { path } = ReadFile.parse(rawInput);
-        return { content: await ctx.workspace.read(path) };
+        if (/\.(docx|pptx|xlsx|xlsm|pdf)$/i.test(path)) {
+          const { bytes } = await ctx.workspace.readBytes(path);
+          const text = await extractText(bytes, path);
+          if (text === null) return { content: `Cannot extract text from ${path}`, isError: true };
+          return { content: text.length > 512 * 1024 ? text.slice(0, 512 * 1024) + "\n\n[truncated]" : text };
+        }
+        const { bytes } = await ctx.workspace.readBytes(path);
+        if (isBinaryText(bytes)) return { content: `${path} is a binary file (${bytes.byteLength} bytes); read_file only returns text. Office documents and PDFs are converted automatically; images can be attached in the chat.`, isError: true };
+        const text = new TextDecoder().decode(bytes);
+        return { content: text.length > 512 * 1024 ? text.slice(0, 512 * 1024) + `\n\n[truncated: file is ${bytes.byteLength} bytes]` : text };
       }
       case "write_file": {
         const { path, content } = WriteFile.parse(rawInput);

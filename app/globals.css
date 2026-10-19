@@ -73,9 +73,11 @@ select, input, textarea { font: inherit; color: inherit; background: var(--bg-el
 .transcript .welcome { color: var(--fg-dim); white-space: pre-wrap; margin-bottom: 18px; }
 .transcript .welcome b { color: var(--accent); }
 .msg { margin: 0 0 14px; }
-.msg-user { display: flex; gap: 10px; color: var(--fg); }
+/* The user's own prompts: tinted block with an accent bar, like Claude Code's prompt echo. */
+.msg-user { display: flex; gap: 10px; color: var(--fg); background: var(--bg-panel); border-left: 3px solid var(--accent); border-radius: 0 var(--radius) var(--radius) 0; padding: 8px 12px; margin: 18px 0 10px; }
 .msg-user .caret { color: var(--accent); font-weight: 700; }
-.msg-user .body { white-space: pre-wrap; word-break: break-word; }
+.msg-user .body { white-space: pre-wrap; word-break: break-word; font-weight: 500; }
+.msg-assistant { margin-bottom: 18px; }
 .msg-assistant { padding-left: 18px; position: relative; }
 .msg-assistant::before { content: "●"; position: absolute; left: 0; top: 2px; color: var(--accent); font-size: 10px; }
 .msg-assistant.model-tag::after { content: attr(data-model); position: absolute; right: 0; top: 0; color: var(--fg-faint); font-size: 11px; pointer-events: none; }
