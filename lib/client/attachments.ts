@@ -12,6 +12,8 @@ export interface Attachment {
   parts: AstraPart[];
   /** Workspace path when the file was uploaded instead of inlined. */
   path?: string;
+  /** Workspace path of the extracted text for Office/PDF uploads. */
+  textPath?: string;
   preview?: string; // data URL for images
   error?: string;
 }
@@ -69,13 +71,20 @@ export async function prepareAttachment(file: File): Promise<Attachment> {
       const text = await file.text();
       return { ...base, kind: "text", status: "ready", parts: [{ type: "text", text: `<attached_file name="${file.name}">\n${text}\n</attached_file>` }] };
     }
-    // Everything else: store in the workspace so the agent's tools can get at it.
+    // Everything else (Word, PowerPoint, Excel, large PDFs, archives...): store it in the
+    // workspace. The server extracts text from Office and PDF files and returns it when
+    // it is small enough to inline, so the model can read the document right away.
     const form = new FormData();
     form.append("file", file);
     const res = await fetch("/api/workspace/upload", { method: "POST", body: form });
-    const j = (await res.json()) as { path?: string; error?: string };
+    const j = (await res.json()) as { path?: string; textPath?: string; text?: string; extractError?: string; error?: string };
     if (!res.ok || !j.path) throw new Error(j.error ?? `upload failed (${res.status})`);
-    return { ...base, kind: "file", status: "ready", path: j.path, parts: [] };
+    const parts: AstraPart[] = j.text
+      ? [{ type: "text", text: `<attached_file name="${file.name}" source="${j.path}">
+${j.text}
+</attached_file>` }]
+      : [];
+    return { ...base, kind: j.text ? "text" : "file", status: "ready", path: j.path, textPath: j.textPath, parts, error: j.extractError };
   } catch (err) {
     return { ...base, status: "error", error: err instanceof Error ? err.message : String(err) };
   }
@@ -85,8 +94,11 @@ export async function prepareAttachment(file: File): Promise<Attachment> {
 export function partsForSend(text: string, attachments: Attachment[]): AstraPart[] {
   const ready = attachments.filter((a) => a.status === "ready");
   const parts: AstraPart[] = ready.flatMap((a) => a.parts);
-  const uploaded = ready.filter((a) => a.path).map((a) => a.path!);
-  if (uploaded.length) parts.push({ type: "text", text: `Attached files saved to the workspace: ${uploaded.join(", ")}. Use the file tools to inspect them.` });
+  const uploaded = ready.filter((a) => a.path && a.parts.length === 0);
+  if (uploaded.length) {
+    const lines = uploaded.map((a) => (a.textPath ? `${a.path} (text extracted to ${a.textPath}; read that with read_file)` : a.path));
+    parts.push({ type: "text", text: `Attached files saved to the workspace: ${lines.join("; ")}. Use the file tools to inspect them.` });
+  }
   parts.push({ type: "text", text });
   return parts;
 }
